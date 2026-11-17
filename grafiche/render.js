@@ -80,22 +80,26 @@
   // Come in Canva: ogni riga occupa «interlinea × corpo» e la sua linea di base sta a «(a + EXTRA × (interlinea − 1)) × corpo» dal bordo alto della riga.
   // Una riga può avere più parti con stili diversi sulla stessa linea di base (`parts`, es. «Soprano / » in grassetto e «Soprano» in corsivo):
   // non vanno a capo da sole. `impagina` calcola dove finisce ogni riga (serve sia per disegnare sia per controllare che tutto entri).
-  // Quanto e alta una riga dalla sua cima al fondo delle lettere che scendono (g, p, q), e quanto le lettere alte della
-  // riga dopo sporgono sopra la propria cima: servono a capire se due righe vicine si toccherebbero.
-  function altaFinGiu(parti) {
-    var m = 0
-    parti.forEach(function (p) { var f = FONT[p.f]; m = Math.max(m, (f.a + f.desc) * p.size) })
-    return m
+  // Quanto salgono e scendono DAVVERO le lettere di una riga, misurate sul font caricato (non le metriche generiche del
+  // font, che sono molto piu larghe del disegno reale). Servono a tenere le righe vicine come nei template senza farle
+  // toccare: i font sono gli stessi di Almagreal (Noto Serif e Roboto), cambia solo come si calcola l'interlinea.
+  function limiti(ctx, parti, testo) {
+    var su = 0, giu = 0
+    parti.forEach(function (p) {
+      var t = testo != null ? testo : p.t
+      if (!t) return
+      impostaFont(ctx, p, 0)
+      var m = ctx.measureText(t)
+      var a = m.actualBoundingBoxAscent, d = m.actualBoundingBoxDescent
+      var f = FONT[p.f]
+      // se il browser non le dà, si torna alle metriche del font
+      su = Math.max(su, isFinite(a) ? a : f.asc * p.size)
+      giu = Math.max(giu, isFinite(d) ? d : f.desc * p.size)
+    })
+    return { su: su, giu: giu }
   }
-  function sopra(parti) {
-    var m = 0
-    parti.forEach(function (p) { var f = FONT[p.f]; m = Math.max(m, (f.asc - f.a) * p.size) })
-    return m
-  }
-  // Aria minima fra il fondo di una riga e la cima della successiva: 8 millesimi del corpo piu grande delle due.
-  // Senza questa, con interlinea 1 le lettere alte di Noto Serif (le virgolette dei titoli) finiscono dentro la riga
-  // sopra: nei template di Canva non succede perche i loro font hanno aste piu corte dei nostri (Osaid, 17/11/2026).
-  var ARIA = 0.08
+  // Aria minima fra il fondo delle lettere di una riga e la cima di quelle della riga dopo: 5 centesimi del corpo.
+  var ARIA = 0.05
 
   function impagina(ctx, blk) {
     var cima = blk.top
@@ -130,8 +134,13 @@
       if (dopo) {
         var grDopo = 0
         dopo.parti.forEach(function (p) { grDopo = Math.max(grDopo, p.size) })
-        var minimo = altaFinGiu(r.parti) + sopra(dopo.parti) + ARIA * Math.max(gr, grDopo)
-        if (passo < minimo) passo = minimo
+        var fDopo = FONT[dopo.parti[0].f]
+        // dove cadrebbe la linea di base della riga dopo, con il passo del modello
+        var baseDopo = cima + passo + (fDopo.a + EXTRA * (dopo.lh - 1)) * grDopo
+        var mio = limiti(ctx, r.parti, r.insieme ? null : r.testo)
+        var suo = limiti(ctx, dopo.parti, dopo.insieme ? null : dopo.testo)
+        var manca = (base + mio.giu + ARIA * Math.max(gr, grDopo)) - (baseDopo - suo.su)
+        if (manca > 0) passo += manca
       }
       cima += passo
 
