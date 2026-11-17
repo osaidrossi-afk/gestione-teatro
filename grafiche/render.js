@@ -80,48 +80,83 @@
   // Come in Canva: ogni riga occupa «interlinea × corpo» e la sua linea di base sta a «(a + EXTRA × (interlinea − 1)) × corpo» dal bordo alto della riga.
   // Una riga può avere più parti con stili diversi sulla stessa linea di base (`parts`, es. «Soprano / » in grassetto e «Soprano» in corsivo):
   // non vanno a capo da sole. `impagina` calcola dove finisce ogni riga (serve sia per disegnare sia per controllare che tutto entri).
+  // Quanto e alta una riga dalla sua cima al fondo delle lettere che scendono (g, p, q), e quanto le lettere alte della
+  // riga dopo sporgono sopra la propria cima: servono a capire se due righe vicine si toccherebbero.
+  function altaFinGiu(parti) {
+    var m = 0
+    parti.forEach(function (p) { var f = FONT[p.f]; m = Math.max(m, (f.a + f.desc) * p.size) })
+    return m
+  }
+  function sopra(parti) {
+    var m = 0
+    parti.forEach(function (p) { var f = FONT[p.f]; m = Math.max(m, (f.asc - f.a) * p.size) })
+    return m
+  }
+  // Aria minima fra il fondo di una riga e la cima della successiva: 8 millesimi del corpo piu grande delle due.
+  // Senza questa, con interlinea 1 le lettere alte di Noto Serif (le virgolette dei titoli) finiscono dentro la riga
+  // sopra: nei template di Canva non succede perche i loro font hanno aste piu corte dei nostri (Osaid, 17/11/2026).
+  var ARIA = 0.08
+
   function impagina(ctx, blk) {
     var cima = blk.top
     var out = []
     var xMin = Infinity
     var xMax = -Infinity
+
+    // 1. tutte le righe vere, una per una (il testo lungo va a capo da solo), con il loro corpo e i loro font
+    var fisiche = []
     blk.lines.forEach(function (ln) {
-      var run = ln.run
       var lh = ln.lh != null ? ln.lh : blk.lh
       var ls = ln.ls != null ? ln.ls : blk.ls || 0
       if (ln.parts) {
-        var gr = Math.max.apply(null, ln.parts.map(function (p) { return p.size }))
-        var passoP = lh * gr
+        fisiche.push({ parti: ln.parts, lh: lh, ls: ls, strato: ln.strato || '', insieme: true })
+        return
+      }
+      var run = ln.run
+      var pezzi = run.t ? righe(ctx, run, blk.width, ls) : ['']
+      pezzi.forEach(function (testo) {
+        fisiche.push({ parti: [run], testo: testo, lh: lh, ls: ls, strato: ln.strato || '' })
+      })
+    })
+
+    // 2. una sotto l'altra: il passo e quello del modello (interlinea x corpo), allargato solo se le due righe si toccherebbero
+    fisiche.forEach(function (r, i) {
+      var gr = 0
+      r.parti.forEach(function (p) { gr = Math.max(gr, p.size) })
+      var fPrima = FONT[r.parti[0].f]
+      var base = cima + (fPrima.a + EXTRA * (r.lh - 1)) * gr
+      var passo = r.lh * gr
+      var dopo = fisiche[i + 1]
+      if (dopo) {
+        var grDopo = 0
+        dopo.parti.forEach(function (p) { grDopo = Math.max(grDopo, p.size) })
+        var minimo = altaFinGiu(r.parti) + sopra(dopo.parti) + ARIA * Math.max(gr, grDopo)
+        if (passo < minimo) passo = minimo
+      }
+      cima += passo
+
+      if (r.insieme) {
         var wTot = 0
-        ln.parts.forEach(function (p) { wTot += larghezza(ctx, p, p.t, ls) })
-        var fPrima = FONT[ln.parts[0].f]
-        var baseP = cima + (fPrima.a + EXTRA * (lh - 1)) * gr
-        cima += passoP
+        r.parti.forEach(function (p) { wTot += larghezza(ctx, p, p.t, r.ls) })
         var xP = blk.align === 'start' ? blk.left : blk.align === 'end' ? blk.left + blk.width - wTot : blk.left + (blk.width - wTot) / 2
-        ln.parts.forEach(function (p) {
-          var wp = larghezza(ctx, p, p.t, ls)
-          var fp = FONT[p.f]
+        r.parti.forEach(function (p) {
+          var wp = larghezza(ctx, p, p.t, r.ls)
           xMin = Math.min(xMin, xP)
           xMax = Math.max(xMax, xP + wp)
-          out.push({ run: p, testo: p.t, x: xP, base: baseP - (p.rialzo || 0) * gr, ls: ls, w: wp, discesa: fp.desc * p.size, strato: ln.strato || '' })
+          out.push({ run: p, testo: p.t, x: xP, base: base - (p.rialzo || 0) * gr, ls: r.ls, w: wp, discesa: FONT[p.f].desc * p.size, strato: r.strato })
           xP += wp
         })
         return
       }
-      var passo = lh * run.size
-      var f = FONT[run.f]
-      var pezzi = run.t ? righe(ctx, run, blk.width, ls) : ['']
-      pezzi.forEach(function (testo) {
-        var base = cima + (f.a + EXTRA * (lh - 1)) * run.size
-        cima += passo
-        if (!testo) return
-        var w = larghezza(ctx, run, testo, ls)
-        var x = blk.align === 'start' ? blk.left : blk.align === 'end' ? blk.left + blk.width - w : blk.left + (blk.width - w) / 2
-        xMin = Math.min(xMin, x)
-        xMax = Math.max(xMax, x + w)
-        out.push({ run: run, testo: testo, x: x, base: base, ls: ls, w: w, discesa: f.desc * run.size, strato: ln.strato || '' })
-      })
+      if (!r.testo) return
+      var run = r.parti[0]
+      var w = larghezza(ctx, run, r.testo, r.ls)
+      var x = blk.align === 'start' ? blk.left : blk.align === 'end' ? blk.left + blk.width - w : blk.left + (blk.width - w) / 2
+      xMin = Math.min(xMin, x)
+      xMax = Math.max(xMax, x + w)
+      out.push({ run: run, testo: r.testo, x: x, base: base, ls: r.ls, w: w, discesa: FONT[run.f].desc * run.size, strato: r.strato })
     })
+
     var ultimo = out.length ? out[out.length - 1] : null
     return { righe: out, fine: ultimo ? ultimo.base + ultimo.discesa : blk.top, xMin: xMin, xMax: xMax, alto: cima - blk.top }
   }
