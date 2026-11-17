@@ -172,6 +172,14 @@
       <section class="card" aria-labelledby="h-anteprima">
         <h2 id="h-anteprima">Come vengono</h2>
         <div id="solo-scarica-testo" class="controllo ok" role="status" hidden></div>
+        <div id="quando-box" hidden>
+          <label id="quando-eti">Titolo sulle grafiche</label>
+          <div class="tab" role="group" aria-labelledby="quando-eti">
+            <button type="button" id="quando-tonight" data-q="Tonight">TONIGHT · stasera</button>
+            <button type="button" id="quando-tomorrow" data-q="Tomorrow">TOMORROW · domani</button>
+          </div>
+          <div id="quando-stato" class="controllo" role="status" hidden></div>
+        </div>
         <div class="tab" id="tab" role="group" aria-label="Quale grafica vedere"></div>
         <div class="anteprima-box"><canvas id="anteprima" class="anteprima" aria-label="Anteprima della grafica"></canvas><div class="caricamento" id="caricamento"></div></div>
         <div id="controllo" class="controllo" role="status"></div>

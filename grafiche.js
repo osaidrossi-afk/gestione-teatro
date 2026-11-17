@@ -556,11 +556,12 @@
     caricando = true
     chiamata('grafiche_leggi', { chiave: chiave, la_data: data }).then(function (r) {
       caricando = false
-      if (!r) { if (soloScarica) testoSoloScarica(null); mostraConferma('bozza'); quandoDaData(); $('stato-serata').textContent = 'Serata nuova: i campi che vedi restano, cambia quello che serve.'; cambiato(); return }
+      if (!r) { if (soloScarica) { testoSoloScarica(null); aggiornaQuandoBox() } mostraConferma('bozza'); quandoDaData(); $('stato-serata').textContent = 'Serata nuova: i campi che vedi restano, cambia quello che serve.'; cambiato(); return }
       scriviForm(r.dati)
       ultimoSalvato = JSON.stringify(leggiForm())
       mostraConferma(r.stato, r.confermata_il, r.confermata_da)
       if (soloScarica) testoSoloScarica(r)
+      aggiornaQuandoBox()
       var q = new Date(r.aggiornato_il)
       $('stato-serata').textContent = 'Serata già salvata' + (r.autore ? ' da ' + r.autore : '') + ' (' +
         q.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' ' + q.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) + ').'
@@ -782,7 +783,41 @@
     box.className = 'controllo ' + (r.stato === 'confermata' ? 'ok' : 'attenzione')
     box.textContent = 'Serata di ' + giorno + ' — ' + (r.stato === 'confermata'
       ? 'confermata' + (r.confermata_da ? ' da ' + r.confermata_da : '') + (q ? ' il ' + q.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' }) + ' alle ' + q.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }) : '') + '.'
-      : 'non ancora confermata: queste sono le grafiche dell’ultima versione salvata.') + ' Qui si scarica soltanto, non si modifica nulla.'
+      : 'non ancora confermata: queste sono le grafiche dell’ultima versione salvata.') + ' Qui si scarica: l’unica cosa che puoi cambiare è il titolo TONIGHT o TOMORROW.'
+  }
+
+  // ---------- titolo TONIGHT / TOMORROW (anche nella vista «solo scarica») ----------
+  // Cristiano prepara la serata il giorno prima e sceglie «Tomorrow»; al teatro, la sera stessa, serve «Tonight»
+  // (Osaid, 17/11/2026). Qui si cambia in un tocco: la serata resta confermata, cambia solo la scritta sulle grafiche.
+  function aggiornaQuandoBox() {
+    if (!soloScarica) return
+    var q = $('quando').value === 'Tomorrow' ? 'Tomorrow' : 'Tonight'
+    var box = $('quando-box')
+    box.hidden = false
+    $('quando-tonight').setAttribute('aria-pressed', q === 'Tonight')
+    $('quando-tomorrow').setAttribute('aria-pressed', q === 'Tomorrow')
+    var avviso = $('quando-stato')
+    var data = $('data').value
+    var oggi = oggiIso()
+    var storto = data === oggi ? q === 'Tomorrow' : data > oggi && q === 'Tonight'
+    avviso.hidden = false
+    avviso.className = 'controllo ' + (storto ? 'attenzione' : 'ok')
+    avviso.textContent = storto
+      ? (data === oggi
+          ? 'Attenzione: la serata è stasera ma sulle grafiche c’è scritto TOMORROW. Tocca «TONIGHT» prima di scaricare.'
+          : 'Attenzione: la serata è di un altro giorno ma sulle grafiche c’è scritto TONIGHT.')
+      : 'Sulle grafiche compare «' + q.toUpperCase() + ' ' + ($('orario').value || '') + '».'
+  }
+
+  function cambiaQuando(q) {
+    if ($('quando').value === q) return
+    $('quando').value = q
+    aggiornaQuandoBox()
+    anteprima(0)
+    if (typeof locDisegna === 'function') locDisegna()
+    chiamata('grafiche_quando', { chiave: chiave, la_data: $('data').value, il_quando: q })
+      .then(function () { messaggio('Titolo cambiato in ' + q.toUpperCase() + ': le grafiche qui sotto sono già aggiornate.', 'ok') })
+      .catch(function () { messaggio('Il titolo è cambiato qui, ma non sono riuscito a salvarlo: riprova.', 'attenzione') })
   }
 
   // ---------- avvio ----------
@@ -869,6 +904,8 @@
     $('video-questo').addEventListener('click', function () { scaricaVideoLista([tabAttuale()]) })
     $('salva').addEventListener('click', function () { salva(false) })
     $('conferma').addEventListener('click', conferma)
+    $('quando-tonight').addEventListener('click', function () { cambiaQuando('Tonight') })
+    $('quando-tomorrow').addEventListener('click', function () { cambiaQuando('Tomorrow') })
     $('nota-invia').addEventListener('click', inviaNotaPagina)
   }
 
