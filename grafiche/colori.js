@@ -1,11 +1,13 @@
-// I colori delle grafiche della serata. I template di Almagreal sono fatti di due soli colori — un fondo e un
-// «inchiostro» (titolo, figure, scritte) — quindi per cambiare colore a tutta la grafica bastano due colori: si
-// ricolora il fondo PNG pixel per pixel (vedi render.js) e il testo si disegna con lo stesso inchiostro.
+// I colori delle grafiche della serata. Ogni template di Almagreal ha tre colori: il fondo, il colore del titolo e
+// delle figure (stampati nel PNG) e il colore delle scritte che aggiungiamo noi (nomi e programma). Nel ledwall quei
+// due non coincidono — misurati sul template: titolo bordeaux #7c3d36, programma rosso #9b0707 — e la distinzione va
+// tenuta. Il fondo PNG si ricolora pixel per pixel (vedi render.js), le scritte si disegnano col terzo colore.
 // La scelta è di chi scarica, resta nel suo telefono o computer, e non cambia nulla per gli altri.
 (function (global) {
   var CHIAVE = 'grafiche-colori'
 
-  // Coppie pronte: sempre fondo + scritte. Quelle con il fondo scuro sono le «invertite».
+  // Colori pronti: fondo + scritte. Il colore del titolo e delle figure segue il template (vedi titoloPer):
+  // dove Almagreal lo ha fatto diverso dal testo, resta diverso.
   var PRONTI = [
     { nome: 'Rosso su crema', fondo: '#f5efe3', scritte: '#9b0707' },
     { nome: 'Crema su rosso', fondo: '#9b0707', scritte: '#f6f0e4' },
@@ -32,6 +34,27 @@
     { nome: 'Argento su nero', fondo: '#111111', scritte: '#cdd2d6' },
     { nome: 'Rosa antico su bordeaux', fondo: '#5c2230', scritte: '#f0d7d8' },
   ]
+
+  // Dove il template ha il titolo di un colore suo (oggi: il ledwall), scegliendo colori nuovi il titolo resta
+  // distinto dal testo, smorzato verso il fondo nella stessa misura in cui lo era nel template.
+  function titoloPer(nativi, fondo, testo) {
+    if (!nativi || nativi.titolo === nativi.scritte) return testo
+    var k = quanto(nativi.fondo, nativi.scritte, nativi.titolo)
+    return mescola(fondo, testo, k)
+  }
+  // quanto del secondo colore c'e in «mezzo», fra primo e secondo (0 = tutto il primo, 1 = tutto il secondo)
+  function quanto(a, b, mezzo) {
+    var A = rgb(a), B = rgb(b), M = rgb(mezzo)
+    var vx = B[0]-A[0], vy = B[1]-A[1], vz = B[2]-A[2]
+    var vv = vx*vx + vy*vy + vz*vz || 1
+    var k = ((M[0]-A[0])*vx + (M[1]-A[1])*vy + (M[2]-A[2])*vz) / vv
+    return Math.max(0.25, Math.min(0.95, k))
+  }
+  function mescola(a, b, k) {
+    var A = rgb(a), B = rgb(b)
+    var v = [0,1,2].map(function (i) { return Math.round(A[i] + (B[i]-A[i])*k) })
+    return '#' + v.map(function (x) { return ('0' + x.toString(16)).slice(-2) }).join('')
+  }
 
   function pulisci(c) {
     var t = String(c == null ? '' : c).trim().replace(/^#/, '')
@@ -71,24 +94,29 @@
   function scelta(modello) {
     var v = leggiTutte()[modello]
     if (!v) return null
-    var f = pulisci(v.fondo), s = pulisci(v.scritte)
-    return f && s ? { fondo: f, scritte: s } : null
+    var f = pulisci(v.fondo), s = pulisci(v.scritte), ti = pulisci(v.titolo)
+    if (!f || !s) return null
+    return { fondo: f, titolo: ti || s, scritte: s }
   }
 
-  function imposta(modello, coppia) {
+  function imposta(modello, terna) {
     var v = leggiTutte()
-    if (!coppia) delete v[modello]
+    if (!terna) delete v[modello]
     else {
-      var f = pulisci(coppia.fondo), s = pulisci(coppia.scritte)
+      var f = pulisci(terna.fondo), s = pulisci(terna.scritte), ti = pulisci(terna.titolo)
       if (!f || !s) return false
-      v[modello] = { fondo: f, scritte: s }
+      v[modello] = { fondo: f, titolo: ti || s, scritte: s }
     }
     salvaTutte(v)
     return true
   }
 
+  // modelli = [{chiave, nativi}]: ognuno tiene il suo rapporto fra titolo e testo.
   function impostaTutti(modelli, coppia) {
-    modelli.forEach(function (m) { imposta(m, coppia) })
+    modelli.forEach(function (m) {
+      imposta(m.chiave, coppia && { fondo: coppia.fondo, scritte: coppia.scritte,
+        titolo: titoloPer(m.nativi, coppia.fondo, coppia.scritte) })
+    })
   }
 
   global.GRAFICHE_COLORI = {
@@ -96,6 +124,8 @@
     pulisci: pulisci,
     rgb: rgb,
     contrasto: contrasto,
+    titoloPer: titoloPer,
+    mescola: mescola,
     luminosita: luminosita,
     scelta: scelta,
     imposta: imposta,

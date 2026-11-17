@@ -244,6 +244,11 @@
   }
 
   // ---------- anteprima ----------
+  // L'anteprima si disegna al doppio di come si vede (il riquadro è largo al massimo ~720 px): così su schermi e
+  // telefoni ad alta definizione il testo resta nitido, e anche sugli altri il rimpicciolimento del browser è più
+  // pulito di quello del canvas. Oltre non serve: si disegnerebbero pixel che nessuno vede.
+  function ANTEPRIMA(m) { return Math.min(1, 1520 / m.w) }
+
   function modelloDi(tab) { return window.GRAFICHE_MODELLI[tab.modello()] }
   function tabAttuale() { return TABS.filter(function (t) { return t.id === tabCorrente })[0] }
 
@@ -297,7 +302,7 @@
       var d = perDisegno(leggiForm())
       var canvas = $('anteprima')
       var tmp = document.createElement('canvas')
-      window.GRAFICHE_RENDER.disegna(tmp, m, d, { scala: Math.min(1, 760 / m.w) }).then(function () {
+      window.GRAFICHE_RENDER.disegna(tmp, m, d, { scala: ANTEPRIMA(m) }).then(function () {
         if (mio !== gettone) return
         canvas.width = tmp.width
         canvas.height = tmp.height
@@ -643,7 +648,7 @@
     var m = window.GRAFICHE_MODELLI[l.modello]
     var mio = ++locGettone
     var tmp = document.createElement('canvas')
-    window.GRAFICHE_RENDER.disegna(tmp, m, locDati(), { scala: Math.min(1, 760 / m.w) }).then(function () {
+    window.GRAFICHE_RENDER.disegna(tmp, m, locDati(), { scala: ANTEPRIMA(m) }).then(function () {
       if (mio !== locGettone) return
       var c = $('loc-anteprima')
       c.width = tmp.width
@@ -841,10 +846,14 @@
     return (window.GRAFICHE_COLORI.scelta(m.chiave) || m.nativi) || null
   }
 
-  function cambiaColori(coppia) {
+  function modelliConColori() {
+    return TABS.map(function (x) { return modelloDi(x) }).filter(function (m) { return m.nativi })
+  }
+
+  function cambiaColori(terna) {
     var m = modelloDi(tabAttuale())
     if (!m.nativi) return
-    window.GRAFICHE_COLORI.imposta(m.chiave, coppia)
+    window.GRAFICHE_COLORI.imposta(m.chiave, terna)
     aggiornaColori()
     anteprima(0)
   }
@@ -866,25 +875,31 @@
       dentro.style.background = c.fondo
       dentro.style.color = c.scritte
       b.appendChild(dentro)
-      b.addEventListener('click', function () { cambiaColori({ fondo: c.fondo, scritte: c.scritte }) })
+      b.addEventListener('click', function () {
+        // il titolo segue il template: dove Almagreal lo ha fatto diverso dal testo (il ledwall), resta diverso
+        cambiaColori({ fondo: c.fondo, scritte: c.scritte, titolo: window.GRAFICHE_COLORI.titoloPer(m.nativi, c.fondo, c.scritte) })
+      })
       griglia.appendChild(b)
     })
     $('hex-fondo').value = ora.fondo
+    $('hex-titolo').value = ora.titolo
     $('hex-scritte').value = ora.scritte
     $('pick-fondo').value = ora.fondo
+    $('pick-titolo').value = ora.titolo
     $('pick-scritte').value = ora.scritte
-    var k = window.GRAFICHE_COLORI.contrasto(ora.fondo, ora.scritte)
+    var k = Math.min(window.GRAFICHE_COLORI.contrasto(ora.fondo, ora.scritte),
+      window.GRAFICHE_COLORI.contrasto(ora.fondo, ora.titolo))
     var avviso = $('colori-stato')
     avviso.hidden = false
     if (k < 3) {
       avviso.className = 'controllo attenzione'
-      avviso.textContent = 'Questi due colori si somigliano troppo: sulla grafica il programma si leggerebbe male. Scegline due piu diversi.'
+      avviso.textContent = 'Un colore si somiglia troppo al fondo: sulla grafica si leggerebbe male. Cambialo con uno piu diverso.'
     } else if (qrStorti()) {
       avviso.className = 'controllo attenzione'
       avviso.textContent = AVVISO_QR
     } else {
       avviso.className = 'controllo ok'
-      avviso.textContent = 'I due colori si distinguono bene' + (window.GRAFICHE_COLORI.scelta(m.chiave) ? '.' : ' (sono quelli di Almagreal).')
+      avviso.textContent = 'I colori si distinguono bene' + (window.GRAFICHE_COLORI.scelta(m.chiave) ? '.' : ' (sono quelli di partenza).')
     }
   }
 
@@ -893,8 +908,10 @@
     if (!pulito) return
     var ora = coppiaAttuale()
     if (pulito === ora[quale]) return
-    var nuova = { fondo: ora.fondo, scritte: ora.scritte }
+    var nuova = { fondo: ora.fondo, titolo: ora.titolo, scritte: ora.scritte }
     nuova[quale] = pulito
+    // cambiando fondo o testo da una coppia pronta il titolo si riallinea, a meno che non sia lui quello toccato
+    if (quale !== 'titolo') nuova.titolo = window.GRAFICHE_COLORI.titoloPer(modelloDi(tabAttuale()).nativi, nuova.fondo, nuova.scritte)
     cambiaColori(nuova)
   }
 
@@ -986,21 +1003,23 @@
     $('quando-tomorrow').addEventListener('click', function () { cambiaQuando('Tomorrow') })
     $('nota-invia').addEventListener('click', inviaNotaPagina)
     $('hex-fondo').addEventListener('change', function () { scriviColore('fondo', this.value) })
+    $('hex-titolo').addEventListener('change', function () { scriviColore('titolo', this.value) })
+    $('pick-titolo').addEventListener('change', function () { scriviColore('titolo', this.value) })
     $('hex-scritte').addEventListener('change', function () { scriviColore('scritte', this.value) })
     $('pick-fondo').addEventListener('change', function () { scriviColore('fondo', this.value) })
     $('pick-scritte').addEventListener('change', function () { scriviColore('scritte', this.value) })
     $('colori-tutte').addEventListener('click', function () {
       var ora = coppiaAttuale()
-      window.GRAFICHE_COLORI.impostaTutti(TABS.map(function (x) { return modelloDi(x).chiave }), { fondo: ora.fondo, scritte: ora.scritte })
+      window.GRAFICHE_COLORI.impostaTutti(modelliConColori(), { fondo: ora.fondo, scritte: ora.scritte })
       aggiornaColori()
       anteprima(0)
-      messaggio('Tutte le grafiche della serata ora hanno questi due colori.', 'ok')
+      messaggio('Tutte le grafiche della serata ora hanno questi colori.', 'ok')
     })
     $('colori-originale').addEventListener('click', function () {
-      window.GRAFICHE_COLORI.impostaTutti(TABS.map(function (x) { return modelloDi(x).chiave }), null)
+      window.GRAFICHE_COLORI.impostaTutti(modelliConColori(), null)
       aggiornaColori()
       anteprima(0)
-      messaggio('Grafiche tornate ai colori dei template di Almagreal.', 'ok')
+      messaggio('Grafiche tornate ai colori di partenza.', 'ok')
     })
     aggiornaColori()
   }

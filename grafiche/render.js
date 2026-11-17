@@ -312,10 +312,13 @@
     c.width = w
     c.height = h
     var x = c.getContext('2d', { willReadFrequently: true })
+    // rimpicciolendo per l'anteprima, senza questo il titolo stampato nel fondo viene piu sfocato di prima
+    x.imageSmoothingEnabled = true
+    if ('imageSmoothingQuality' in x) x.imageSmoothingQuality = 'high'
     x.drawImage(im, 0, 0, w, h)
     var dati = x.getImageData(0, 0, w, h)
     var p = dati.data
-    var f0 = C.rgb(da.fondo), i0 = C.rgb(da.scritte), f1 = C.rgb(a.fondo), i1 = C.rgb(a.scritte)
+    var f0 = C.rgb(da.fondo), i0 = C.rgb(da.titolo), f1 = C.rgb(a.fondo), i1 = C.rgb(a.titolo)
     var vx = i0[0] - f0[0], vy = i0[1] - f0[1], vz = i0[2] - f0[2]
     var vv = vx * vx + vy * vy + vz * vz || 1
     var dx = i1[0] - f1[0], dy = i1[1] - f1[1], dz = i1[2] - f1[2]

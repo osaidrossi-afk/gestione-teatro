@@ -194,9 +194,9 @@
         </div>
         <details id="colori-box">
           <summary>Cambia i colori di questa grafica</summary>
-          <p class="fisso">Ogni grafica è fatta di due colori: il fondo e tutto il resto (titolo, figure, nomi, programma).
-            Scegli una coppia pronta, oppure scrivi il codice del colore che vuoi. La scelta resta in questo telefono o computer e
-            vale per le immagini che scarichi da qui.</p>
+          <p class="fisso">Ogni grafica ha tre colori: il fondo, il titolo con le figure, e le scritte che aggiungiamo noi (nomi e programma).
+            Nel ledwall gli ultimi due non sono uguali, come li ha fatti Almagreal: scegliendo colori pronti la differenza resta.
+            Puoi anche scrivere il codice di ognuno. La scelta resta in questo telefono o computer e vale per le immagini che scarichi da qui.</p>
           <div class="tavolozza" id="tavolozza" role="group" aria-label="Colori pronti"></div>
           <div class="su-misura">
             <div>
@@ -207,7 +207,14 @@
               </div>
             </div>
             <div>
-              <label for="hex-scritte">Codice delle scritte</label>
+              <label for="hex-titolo">Codice del titolo e delle figure</label>
+              <div class="codice">
+                <input id="hex-titolo" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#7c3d36" maxlength="7" />
+                <input id="pick-titolo" type="color" aria-label="Scegli il colore del titolo e delle figure" />
+              </div>
+            </div>
+            <div>
+              <label for="hex-scritte">Codice di nomi e programma</label>
               <div class="codice">
                 <input id="hex-scritte" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#9b0707" maxlength="7" />
                 <input id="pick-scritte" type="color" aria-label="Scegli il colore delle scritte" />
@@ -216,7 +223,7 @@
           </div>
           <div class="azioni">
             <button type="button" id="colori-tutte">Usa questi colori su tutte le grafiche</button>
-            <button type="button" id="colori-originale">Torna ai colori di Almagreal (tutte)</button>
+            <button type="button" id="colori-originale">Rimetti i colori di partenza (tutte)</button>
           </div>
           <div id="colori-stato" class="controllo" role="status" hidden></div>
         </details>

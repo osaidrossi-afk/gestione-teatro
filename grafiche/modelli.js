@@ -233,9 +233,12 @@
     var s = global.GRAFICHE_COLORI && global.GRAFICHE_COLORI.scelta(chiave)
     return s || nativi
   }
-  var NAT_CHIARO = { fondo: '#f5efe3', scritte: ROSSO }
-  var NAT_LEDWALL = { fondo: '#7c3d36', scritte: CREMA }
-  var NAT_GRAZIE = { fondo: '#f4eee2', scritte: ROSSO }
+  // Misurati sui template di Almagreal (17/11/2026): negli esterni, negli interni e nel ringraziamento il titolo e
+  // delle stesse scritte (rosso #9b0707); nel ledwall no, li il titolo e le figure sono bordeaux e il programma rosso.
+  // Il ledwall e invertito (fondo bordeaux): titolo e figure in rosa cipria, programma in crema piena.
+  var NAT_CHIARO = { fondo: '#f5efe3', titolo: ROSSO, scritte: ROSSO }
+  var NAT_LEDWALL = { fondo: '#7c3d36', titolo: '#d4beb3', scritte: CREMA }
+  var NAT_GRAZIE = { fondo: '#f4eee2', titolo: ROSSO, scritte: ROSSO }
 
   var MODELLI = {
     // Schermi esterni, verticali 2160x3840: nomi e programma insieme, su due colonne (prima parte a sinistra, seconda a destra)
