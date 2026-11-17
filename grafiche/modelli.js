@@ -157,18 +157,26 @@
         var C = cfg.colore || ROSSO
         return [conStrato(riga('serifbi', cfg.st.parte * sc, C, testo), 'p'), riga('sans', cfg.st.parte * sc, C, '')]
       }
-      var prima = da(0, finePrima), seconda = da(finePrima, voci.length)
-      var gruppi
-      if (n <= 2) gruppi = [prima, seconda]
-      else {
-        var alte = prima.map(function (ix) {
-          return R.impagina(ctx, { left: 0, top: 0, width: cfg.colonne[0].width, align: 'center', lh: 1, ls: cfg.ls, lines: items[ix] }).alto
-        })
-        var due = dividiFlusso(alte, n - 1)
-        gruppi = [due[0].map(function (i) { return prima[i] }), due[1].map(function (i) { return prima[i] }), seconda]
+      var larga = cfg.colonne[0].width
+      var alta = function (ix) {
+        return R.impagina(ctx, { left: 0, top: 0, width: larga, align: 'center', lh: 1, ls: cfg.ls, lines: items[ix] }).alto
       }
+      var prima = da(0, finePrima), seconda = da(finePrima, voci.length)
+      var hPrima = prima.reduce(function (s, ix) { return s + alta(ix) }, 0)
+      var hSeconda = seconda.reduce(function (s, ix) { return s + alta(ix) }, 0)
+      // Quante colonne tocca a ciascuna parte: in proporzione a quanto e lunga, almeno una a testa. Cosi su una
+      // grafica larga e bassa (gli schermi interni) nessuna colonna si ritrova il doppio dei brani delle altre,
+      // e il testo non deve rimpicciolirsi per starci dentro.
+      var nPrima = 1
+      if (n > 2) nPrima = Math.max(1, Math.min(n - (seconda.length ? 1 : 0), Math.round(n * hPrima / (hPrima + hSeconda || 1))))
+      if (!seconda.length) nPrima = n
+      var gruppi = []
+      dividiFlusso(prima.map(alta), nPrima).forEach(function (g) { gruppi.push(g.map(function (i) { return prima[i] })) })
+      if (seconda.length) dividiFlusso(seconda.map(alta), n - nPrima).forEach(function (g) { gruppi.push(g.map(function (i) { return seconda[i] })) })
       blocchi = cfg.colonne.map(function (col, c) {
-        var lines = col.parte ? intestazione(col.parte) : []
+        // «1° PARTE» sulla prima colonna della prima parte, «2° PARTE» sulla prima della seconda
+        var eti = c === 0 ? cfg.parti[0] : (c === nPrima && seconda.length ? cfg.parti[1] : null)
+        var lines = eti ? intestazione(eti) : []
         ;(gruppi[c] || []).forEach(function (ix) {
           items[ix].forEach(function (l) { l.strato = 'v' + ix })
           lines = lines.concat(items[ix])
@@ -224,7 +232,11 @@
   // parte distinte. I numeri qui sotto sono quelli dei template, moltiplicati per la scala a cui disegniamo.
   var K = 2 // i template esterni e interni sono 1080x1920 e 1920x1080: si disegna al doppio (2160x3840 e 3840x2160)
   var ST_ESTERNI = { opera: 34.4899 * K, aria: 29.6398 * K, autore: 27.2215 * K, vuoto: 29.916 * K, parte: 34.4899 * K }
-  var ST_INTERNI = { opera: 22.541 * K, aria: 19.371 * K, autore: 17.79 * K, vuoto: 19.551 * K, parte: 22.541 * K }
+  // Gli schermi interni sono larghi e bassi: con le caselle strette del template il programma si rimpiccioliva
+  // troppo. Ora le colonne sono quattro e larghe, e il corpo parte piu grande (1,35 volte le misure del template),
+  // cosi una serata normale si legge da lontano (Osaid, 17/11/2026).
+  var MI = 1.55
+  var ST_INTERNI = { opera: 22.541 * K * MI, aria: 19.371 * K * MI, autore: 17.79 * K * MI, vuoto: 19.551 * K * MI, parte: 22.541 * K * MI }
   var ST_LEDWALL = { opera: 81.144, aria: 69.733, autore: 64.043, vuoto: 70.383, parte: 81.144 }
 
   // I due colori con cui e disegnato ogni fondo di Almagreal. Se chi scarica ne ha scelti altri (colori.js), valgono
@@ -265,10 +277,10 @@
       blocchi: function (d, ctx) {
         var I = tinta('esterni', NAT_CHIARO).scritte
         var b = programma(d, ctx, { larghezza: 2160, st: ST_ESTERNI, ls: 0.039, colore: I,
-          nomi: ['programma di sinistra', 'programma di destra'],
+          nomi: ['programma di sinistra', 'programma di destra'], parti: ['1\u00b0 PARTE', '2\u00b0 PARTE'],
           colonne: [
-            { left: 108 * K, width: 387.596 * K, top: 758.665 * K, maxY: 1700 * K, parte: '1\u00b0 PARTE' },
-            { left: 553.078 * K, width: 418.922 * K, top: 758.665 * K, maxY: 1495 * K, parte: '2\u00b0 PARTE' },
+            { left: 108 * K, width: 387.596 * K, top: 758.665 * K, maxY: 1700 * K },
+            { left: 553.078 * K, width: 418.922 * K, top: 758.665 * K, maxY: 1495 * K },
           ] })
         return con([
           nomi(d, ctx, { left: 0, top: 481.203 * K, width: 1080 * K, size: 34.6666 * K, lh: 1.36, ls: 0.026, colore: I }),
@@ -285,14 +297,14 @@
       blocchi: function (d, ctx) {
         var I = tinta('ledwall', NAT_LEDWALL).scritte
         var b = programma(d, ctx, { larghezza: 4224, st: ST_LEDWALL, ls: 0.039, colore: I,
-          nomi: ['programma 1', 'programma 2', 'programma 3'],
+          nomi: ['programma 1', 'programma 2', 'programma 3'], parti: ['1\u00b0 PARTE', '2\u00b0 PARTE'],
             // Il fondo del ledwall e invertito (17/11/2026): il testo e color crema come le figure in basso, quindi le
             // colonne si fermano PRIMA di toccarle, altrimenti si confondono. Misurato sul fondo: le figure cominciano
             // a y 3169 sotto la prima e la terza colonna, a 3514 sotto quella centrale.
           colonne: [
-            { left: 530.1, width: 911.9, top: 1761.3, maxY: 3150, parte: '1\u00b0 PARTE' },
+            { left: 530.1, width: 911.9, top: 1761.3, maxY: 3150 },
             { left: 1602.3, width: 946, top: 1918.2, maxY: 3490 },
-            { left: 2708.3, width: 985.6, top: 1761.3, maxY: 3150, parte: '2\u00b0 PARTE' },
+            { left: 2708.3, width: 985.6, top: 1761.3, maxY: 3150 },
           ] })
         return con([
           nomi(d, ctx, { left: 352.4, top: 1306.2, width: 3519.2, size: 76.691, lh: 1.13, ls: 0.026, unaRiga: true, colore: I }),
@@ -313,11 +325,15 @@
       blocchi: function (d, ctx) {
         var I = tinta('interni', NAT_CHIARO).scritte
         var b = programma(d, ctx, { larghezza: 3840, st: ST_INTERNI, ls: 0.039, colore: I,
-          nomi: ['programma 1', 'programma 2', 'programma 3'],
+          nomi: ['programma 1', 'programma 2', 'programma 3', 'programma 4'], parti: ['1\u00b0 PARTE', '2\u00b0 PARTE'],
+            // Le caselle del template erano strette (circa 520 px l'una) e il programma si rimpiccioliva troppo per
+            // starci (Osaid, 17/11/2026). Lo spazio davvero libero nel fondo, misurato pixel per pixel, va da x 532
+            // a x 3307 e scende fino a y 1800 (sotto comincia «TEATRO NAZIONALE»): le colonne ora lo usano tutto.
           colonne: [
-            { left: 433.9 * K, width: 253.3 * K, top: 466.5 * K, maxY: 880 * K, parte: '1\u00b0 PARTE' },
-            { left: 828.6 * K, width: 262.8 * K, top: 510.1 * K, maxY: 830 * K },
-            { left: 1232.4 * K, width: 273.8 * K, top: 466.5 * K, maxY: 900 * K, parte: '2\u00b0 PARTE' },
+            { left: 532, width: 611, top: 466.5 * K, maxY: 1820 },
+            { left: 1253, width: 611, top: 466.5 * K, maxY: 1820 },
+            { left: 1974, width: 611, top: 466.5 * K, maxY: 1820 },
+            { left: 2696, width: 611, top: 466.5 * K, maxY: 1820 },
           ] })
         return con([
           nomi(d, ctx, { left: 420.248 * K, top: 332.604 * K, width: 1079.5 * K, size: 23.525 * K, lh: 1.13, ls: 0.026, unaRiga: true, colore: I }),
