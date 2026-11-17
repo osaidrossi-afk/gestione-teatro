@@ -254,14 +254,27 @@
       var b = el('button', null, t.nome)
       b.type = 'button'
       b.setAttribute('aria-pressed', t.id === tabCorrente)
-      b.addEventListener('click', function () { tabCorrente = t.id; aggiornaTab(); anteprima(0) })
+      b.addEventListener('click', function () { tabCorrente = t.id; aggiornaTab(); aggiornaColori(); anteprima(0) })
       box.appendChild(b)
     })
   }
 
+  // I due QR del ringraziamento (recensione e prossima serata) sono disegnati con l'inchiostro: se chi scarica sceglie
+  // un fondo piu scuro vengono chiari su scuro, e molti telefoni non li leggono. L'avviso si vede sotto l'anteprima,
+  // non solo dentro il riquadro dei colori, perche quello sta chiuso.
+  function qrStorti() {
+    var m = modelloDi(tabAttuale())
+    if (!m || m.chiave !== 'ledwall-grazie') return false
+    var c = window.GRAFICHE_COLORI.scelta(m.chiave)
+    if (!c) return false
+    return window.GRAFICHE_COLORI.luminosita(c.fondo) < window.GRAFICHE_COLORI.luminosita(c.scritte)
+  }
+  var AVVISO_QR = 'Attenzione: con il fondo scuro i due QR vengono chiari su scuro e molti telefoni non li leggono. Per questa grafica scegli un fondo chiaro.'
+
   function mostraControllo(g) {
     var c = $('controllo')
     if (!g) { c.textContent = ''; c.className = 'controllo'; return }
+    if (qrStorti()) { c.className = 'controllo attenzione'; c.textContent = AVVISO_QR; return }
     var troppoPiccolo = g.minimo && g.scala < g.minimo
     if (g.problemi.length || troppoPiccolo) {
       c.className = 'controllo attenzione'
@@ -819,6 +832,72 @@
       .catch(function () { messaggio('Il titolo è cambiato qui, ma non sono riuscito a salvarlo: riprova.', 'attenzione') })
   }
 
+  // ---------- colori ----------
+  // Ogni grafica e fatta di due colori: il fondo del template e l'inchiostro (titolo, figure, nomi, programma).
+  // Qui si cambiano: coppie pronte, oppure il codice scritto a mano. La scelta resta nel telefono di chi scarica
+  // (colori.js) e vale per le immagini che scarica da qui; non cambia la serata ne quello che vedono gli altri.
+  function coppiaAttuale() {
+    var m = modelloDi(tabAttuale())
+    return (window.GRAFICHE_COLORI.scelta(m.chiave) || m.nativi) || null
+  }
+
+  function cambiaColori(coppia) {
+    var m = modelloDi(tabAttuale())
+    if (!m.nativi) return
+    window.GRAFICHE_COLORI.imposta(m.chiave, coppia)
+    aggiornaColori()
+    anteprima(0)
+  }
+
+  function aggiornaColori() {
+    var box = $('colori-box')
+    var m = modelloDi(tabAttuale())
+    if (!m || !m.nativi) { box.hidden = true; return }
+    box.hidden = false
+    var ora = coppiaAttuale()
+    var griglia = $('tavolozza')
+    griglia.textContent = ''
+    window.GRAFICHE_COLORI.PRONTI.forEach(function (c) {
+      var b = el('button')
+      b.type = 'button'
+      b.title = c.nome
+      b.setAttribute('aria-pressed', c.fondo === ora.fondo && c.scritte === ora.scritte)
+      var dentro = el('span', 'provino', c.nome)
+      dentro.style.background = c.fondo
+      dentro.style.color = c.scritte
+      b.appendChild(dentro)
+      b.addEventListener('click', function () { cambiaColori({ fondo: c.fondo, scritte: c.scritte }) })
+      griglia.appendChild(b)
+    })
+    $('hex-fondo').value = ora.fondo
+    $('hex-scritte').value = ora.scritte
+    $('pick-fondo').value = ora.fondo
+    $('pick-scritte').value = ora.scritte
+    var k = window.GRAFICHE_COLORI.contrasto(ora.fondo, ora.scritte)
+    var avviso = $('colori-stato')
+    avviso.hidden = false
+    if (k < 3) {
+      avviso.className = 'controllo attenzione'
+      avviso.textContent = 'Questi due colori si somigliano troppo: sulla grafica il programma si leggerebbe male. Scegline due piu diversi.'
+    } else if (qrStorti()) {
+      avviso.className = 'controllo attenzione'
+      avviso.textContent = AVVISO_QR
+    } else {
+      avviso.className = 'controllo ok'
+      avviso.textContent = 'I due colori si distinguono bene' + (window.GRAFICHE_COLORI.scelta(m.chiave) ? '.' : ' (sono quelli di Almagreal).')
+    }
+  }
+
+  function scriviColore(quale, valore) {
+    var pulito = window.GRAFICHE_COLORI.pulisci(valore)
+    if (!pulito) return
+    var ora = coppiaAttuale()
+    if (pulito === ora[quale]) return
+    var nuova = { fondo: ora.fondo, scritte: ora.scritte }
+    nuova[quale] = pulito
+    cambiaColori(nuova)
+  }
+
   // ---------- avvio ----------
   function errore(testo) {
     $('contenuto').hidden = true
@@ -906,6 +985,24 @@
     $('quando-tonight').addEventListener('click', function () { cambiaQuando('Tonight') })
     $('quando-tomorrow').addEventListener('click', function () { cambiaQuando('Tomorrow') })
     $('nota-invia').addEventListener('click', inviaNotaPagina)
+    $('hex-fondo').addEventListener('change', function () { scriviColore('fondo', this.value) })
+    $('hex-scritte').addEventListener('change', function () { scriviColore('scritte', this.value) })
+    $('pick-fondo').addEventListener('change', function () { scriviColore('fondo', this.value) })
+    $('pick-scritte').addEventListener('change', function () { scriviColore('scritte', this.value) })
+    $('colori-tutte').addEventListener('click', function () {
+      var ora = coppiaAttuale()
+      window.GRAFICHE_COLORI.impostaTutti(TABS.map(function (x) { return modelloDi(x).chiave }), { fondo: ora.fondo, scritte: ora.scritte })
+      aggiornaColori()
+      anteprima(0)
+      messaggio('Tutte le grafiche della serata ora hanno questi due colori.', 'ok')
+    })
+    $('colori-originale').addEventListener('click', function () {
+      window.GRAFICHE_COLORI.impostaTutti(TABS.map(function (x) { return modelloDi(x).chiave }), null)
+      aggiornaColori()
+      anteprima(0)
+      messaggio('Grafiche tornate ai colori dei template di Almagreal.', 'ok')
+    })
+    aggiornaColori()
   }
 
   avvia()

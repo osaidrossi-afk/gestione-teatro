@@ -82,6 +82,18 @@
     progress { width: 100%; height: 12px; margin-top: 10px; accent-color: var(--accent); }
     details summary { cursor: pointer; font-size: 14px; font-weight: 600; padding: 6px 0; }
     .solo-scarica .modifica { display: none !important; }
+    #colori-box { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; background: var(--campo); }
+    #colori-box summary { padding: 4px 0; }
+    .tavolozza { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; margin: 8px 0 2px; }
+    .tavolozza button { padding: 0; border-radius: 10px; overflow: hidden; border: 2px solid var(--line); background: none; }
+    .tavolozza button[aria-pressed="true"] { border-color: var(--accent); }
+    .tavolozza .provino { display: block; padding: 10px 6px; font-size: 12px; font-weight: 700; text-align: center;
+      line-height: 1.2; overflow-wrap: anywhere; }
+    .su-misura { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    @media (max-width: 560px) { .su-misura { grid-template-columns: 1fr; } }
+    .codice { display: flex; gap: 6px; align-items: center; }
+    .codice input[type="text"] { flex: 1; text-transform: lowercase; }
+    .codice input[type="color"] { width: 46px; height: 44px; padding: 2px; flex: none; }
   </style>
 </head>
 <body>
@@ -180,6 +192,34 @@
           </div>
           <div id="quando-stato" class="controllo" role="status" hidden></div>
         </div>
+        <details id="colori-box">
+          <summary>Cambia i colori di questa grafica</summary>
+          <p class="fisso">Ogni grafica è fatta di due colori: il fondo e tutto il resto (titolo, figure, nomi, programma).
+            Scegli una coppia pronta, oppure scrivi il codice del colore che vuoi. La scelta resta in questo telefono o computer e
+            vale per le immagini che scarichi da qui.</p>
+          <div class="tavolozza" id="tavolozza" role="group" aria-label="Colori pronti"></div>
+          <div class="su-misura">
+            <div>
+              <label for="hex-fondo">Codice del fondo</label>
+              <div class="codice">
+                <input id="hex-fondo" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#f5efe3" maxlength="7" />
+                <input id="pick-fondo" type="color" aria-label="Scegli il colore del fondo" />
+              </div>
+            </div>
+            <div>
+              <label for="hex-scritte">Codice delle scritte</label>
+              <div class="codice">
+                <input id="hex-scritte" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#9b0707" maxlength="7" />
+                <input id="pick-scritte" type="color" aria-label="Scegli il colore delle scritte" />
+              </div>
+            </div>
+          </div>
+          <div class="azioni">
+            <button type="button" id="colori-tutte">Usa questi colori su tutte le grafiche</button>
+            <button type="button" id="colori-originale">Torna ai colori di Almagreal (tutte)</button>
+          </div>
+          <div id="colori-stato" class="controllo" role="status" hidden></div>
+        </details>
         <div class="tab" id="tab" role="group" aria-label="Quale grafica vedere"></div>
         <div class="anteprima-box"><canvas id="anteprima" class="anteprima" aria-label="Anteprima della grafica"></canvas><div class="caricamento" id="caricamento"></div></div>
         <div id="controllo" class="controllo" role="status"></div>
@@ -242,6 +282,7 @@
       La pagina non usa cookie né servizi esterni; la bozza che stai scrivendo resta anche nel tuo telefono, per non perderla. Le foto delle locandine vengono dalla raccolta del teatro. Font: Noto Serif e Roboto (licenza SIL OFL).</p>
   </main>
   <script src="/grafiche/render.js"></script>
+  <script src="/grafiche/colori.js"></script>
   <script src="/grafiche/testi.js"></script>
   <script src="/grafiche/modelli.js"></script>
   <script src="/grafiche/lib/mp4-muxer.js"></script>

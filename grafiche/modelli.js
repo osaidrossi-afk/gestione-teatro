@@ -6,6 +6,8 @@
 (function (global) {
   var BIANCO = '#ffffff'
   var ROSSO = '#9b0707' // il rosso dei template del 17/11/2026
+  // Il ledwall ha i colori invertiti (fondo bordeaux): li il testo e color crema, come il titolo e le figure.
+  var CREMA = '#f6f0e4'
   var T = global.GRAFICHE_TESTI
   var SCALA_MIN = 0.5 // sotto questa dimensione si avverte che i testi sono troppo piccoli
   var MARGINE = 0.012 // come render.js: il testo non si avvicina al bordo più di 12 millesimi della larghezza
@@ -57,10 +59,11 @@
   function nomi(d, ctx, cfg) {
     var lista = artisti(d).filter(function (a) { return String(a.nome || '').trim() })
     var unaRiga = !!cfg.unaRiga
+    var C = cfg.colore || ROSSO
     var parti = function (a, k, ultimo) {
-      var p = [{ t: a.ruolo + ' ', f: 'serifb', size: cfg.size * k, color: ROSSO },
-        { t: String(a.nome || '').trim(), f: 'serif', size: cfg.size * k, color: ROSSO }]
-      if (unaRiga && !ultimo) p.push({ t: '  |  ', f: 'serif', size: cfg.size * k, color: ROSSO })
+      var p = [{ t: a.ruolo + ' ', f: 'serifb', size: cfg.size * k, color: C },
+        { t: String(a.nome || '').trim(), f: 'serif', size: cfg.size * k, color: C }]
+      if (unaRiga && !ultimo) p.push({ t: '  |  ', f: 'serif', size: cfg.size * k, color: C })
       return p
     }
     var costruisci = function (k) {
@@ -78,25 +81,25 @@
   // ---------- programma ----------
   // L'ordine dei template del 17/11/2026: prima l'OPERA (la piu grande: e il richiamo per il pubblico), poi l'aria tra
   // virgolette, poi l'autore. Prima era il contrario. st = {opera, aria, autore, vuoto, parte}, k = riduzione.
-  function voceRighe(v, st, k) {
+  function voceRighe(v, st, k, C) {
     var o = st.opera * k, a = st.aria * k, u = st.autore * k
-    var vuota = riga('sans', st.vuoto * k, ROSSO, '')
-    if (v.tipo === 'intervallo') return [riga('sansb', u, ROSSO, '\u2014 Interval Drink \u2014'), riga('sans', u, ROSSO, 'Jazz Bar Open'), vuota]
+    var vuota = riga('sans', st.vuoto * k, C, '')
+    if (v.tipo === 'intervallo') return [riga('sansb', u, C, '\u2014 Interval Drink \u2014'), riga('sans', u, C, 'Jazz Bar Open'), vuota]
     if (v.tipo === 'solo') {
       var testo = String(v.testo || 'Piano Solo').split('\n').map(function (x) { return x.trim() }).filter(Boolean)
       var out = []
-      if (testo.length <= 1) out.push(riga('sansb', u, ROSSO, '- ' + (testo[0] || 'Piano Solo') + ' -'))
-      else testo.forEach(function (x) { out.push(riga('sansb', u, ROSSO, x)) })
+      if (testo.length <= 1) out.push(riga('sansb', u, C, '- ' + (testo[0] || 'Piano Solo') + ' -'))
+      else testo.forEach(function (x) { out.push(riga('sansb', u, C, x)) })
       out.push(vuota)
       return out
     }
     var out2 = []
     var opera = String(v.opera || '').trim()
-    if (opera) out2.push(riga('sansh', o, ROSSO, opera))
+    if (opera) out2.push(riga('sansh', o, C, opera))
     var titolo = T.titolo(v.titolo)
-    if (titolo) out2.push(riga('serifb', a, ROSSO, titolo))
+    if (titolo) out2.push(riga('serifb', a, C, titolo))
     var aut = T.autore(v.autore)
-    if (aut) out2.push(riga('sans', u, ROSSO, 'By ' + aut))
+    if (aut) out2.push(riga('sans', u, C, 'By ' + aut))
     out2.push(vuota)
     return out2
   }
@@ -148,10 +151,11 @@
     var scala = 1
     var blocchi
     for (; scala >= 0.3; scala -= 0.01) {
-      var items = voci.map(function (v) { return voceRighe(v, cfg.st, scala) })
+      var items = voci.map(function (v) { return voceRighe(v, cfg.st, scala, cfg.colore || ROSSO) })
       var sc = scala
       var intestazione = function (testo) {
-        return [conStrato(riga('serifbi', cfg.st.parte * sc, ROSSO, testo), 'p'), riga('sans', cfg.st.parte * sc, ROSSO, '')]
+        var C = cfg.colore || ROSSO
+        return [conStrato(riga('serifbi', cfg.st.parte * sc, C, testo), 'p'), riga('sans', cfg.st.parte * sc, C, '')]
       }
       var prima = da(0, finePrima), seconda = da(finePrima, voci.length)
       var gruppi
@@ -223,10 +227,20 @@
   var ST_INTERNI = { opera: 22.541 * K, aria: 19.371 * K, autore: 17.79 * K, vuoto: 19.551 * K, parte: 22.541 * K }
   var ST_LEDWALL = { opera: 81.144, aria: 69.733, autore: 64.043, vuoto: 70.383, parte: 81.144 }
 
+  // I due colori con cui e disegnato ogni fondo di Almagreal. Se chi scarica ne ha scelti altri (colori.js), valgono
+  // quelli: il fondo PNG viene ricolorato e il testo si scrive con lo stesso inchiostro, cosi la grafica resta d'un pezzo.
+  function tinta(chiave, nativi) {
+    var s = global.GRAFICHE_COLORI && global.GRAFICHE_COLORI.scelta(chiave)
+    return s || nativi
+  }
+  var NAT_CHIARO = { fondo: '#f5efe3', scritte: ROSSO }
+  var NAT_LEDWALL = { fondo: '#7c3d36', scritte: CREMA }
+  var NAT_GRAZIE = { fondo: '#f4eee2', scritte: ROSSO }
+
   var MODELLI = {
     // Schermi esterni, verticali 2160x3840: nomi e programma insieme, su due colonne (prima parte a sinistra, seconda a destra)
     'esterni': {
-      w: 2160, h: 3840, plate: 'plate/esterni-2026.png',
+      w: 2160, h: 3840, plate: 'plate/esterni-2026.png', chiave: 'esterni', nativi: NAT_CHIARO,
       video: { plate: 'plate/esterni-2026.png', w: 2160, h: 3840, bitrate: 8e6, tempo: TEMPO, sfondoColore: SFONDO_COLORE, camera: CAMERA, fondo: FONDO,
         livelli: [],
         // prima i nomi degli artisti uno sotto l'altro, poi «CONCERT PROGRAM», poi i brani a cascata
@@ -246,50 +260,56 @@
           return m
         } },
       blocchi: function (d, ctx) {
-        var b = programma(d, ctx, { larghezza: 2160, st: ST_ESTERNI, ls: 0.039,
+        var I = tinta('esterni', NAT_CHIARO).scritte
+        var b = programma(d, ctx, { larghezza: 2160, st: ST_ESTERNI, ls: 0.039, colore: I,
           nomi: ['programma di sinistra', 'programma di destra'],
           colonne: [
             { left: 108 * K, width: 387.596 * K, top: 758.665 * K, maxY: 1700 * K, parte: '1\u00b0 PARTE' },
             { left: 553.078 * K, width: 418.922 * K, top: 758.665 * K, maxY: 1495 * K, parte: '2\u00b0 PARTE' },
           ] })
         return con([
-          nomi(d, ctx, { left: 0, top: 481.203 * K, width: 1080 * K, size: 34.6666 * K, lh: 1.36, ls: 0.026 }),
+          nomi(d, ctx, { left: 0, top: 481.203 * K, width: 1080 * K, size: 34.6666 * K, lh: 1.36, ls: 0.026, colore: I }),
           { nome: 'titolo', left: 298.329 * K, top: 657.528 * K, width: 483.342 * K, align: 'center', lh: 1.05, ls: 0, lines: [
-            conStrato(riga('sansb', 35.6872 * K, ROSSO, 'CONCERT PROGRAM'), 't1'),
-            conStrato(riga('sans', 25 * K, ROSSO, quando(d).toUpperCase() + ' ' + d.orario, 1.3), 't2'),
+            conStrato(riga('sansb', 35.6872 * K, I, 'CONCERT PROGRAM'), 't1'),
+            conStrato(riga('sans', 25 * K, I, quando(d).toUpperCase() + ' ' + d.orario, 1.3), 't2'),
           ] },
         ], b)
       },
     },
     // Ledwall 4224x4320: nomi su una riga sola e programma in tre colonne (la prima parte ne occupa due)
     'ledwall': {
-      w: 4224, h: 4320, plate: 'plate/ledwall-2026.png',
+      w: 4224, h: 4320, plate: 'plate/ledwall-2026.png', chiave: 'ledwall', nativi: NAT_LEDWALL,
       blocchi: function (d, ctx) {
-        var b = programma(d, ctx, { larghezza: 4224, st: ST_LEDWALL, ls: 0.039,
+        var I = tinta('ledwall', NAT_LEDWALL).scritte
+        var b = programma(d, ctx, { larghezza: 4224, st: ST_LEDWALL, ls: 0.039, colore: I,
           nomi: ['programma 1', 'programma 2', 'programma 3'],
+            // Il fondo del ledwall e invertito (17/11/2026): il testo e color crema come le figure in basso, quindi le
+            // colonne si fermano PRIMA di toccarle, altrimenti si confondono. Misurato sul fondo: le figure cominciano
+            // a y 3169 sotto la prima e la terza colonna, a 3514 sotto quella centrale.
           colonne: [
-            { left: 530.1, width: 911.9, top: 1761.3, maxY: 3290, parte: '1\u00b0 PARTE' },
-            { left: 1602.3, width: 946, top: 1918.2, maxY: 3290 },
-            { left: 2708.3, width: 985.6, top: 1761.3, maxY: 3380, parte: '2\u00b0 PARTE' },
+            { left: 530.1, width: 911.9, top: 1761.3, maxY: 3150, parte: '1\u00b0 PARTE' },
+            { left: 1602.3, width: 946, top: 1918.2, maxY: 3490 },
+            { left: 2708.3, width: 985.6, top: 1761.3, maxY: 3150, parte: '2\u00b0 PARTE' },
           ] })
         return con([
-          nomi(d, ctx, { left: 352.4, top: 1306.2, width: 3519.2, size: 76.691, lh: 1.13, ls: 0.026, unaRiga: true }),
+          nomi(d, ctx, { left: 352.4, top: 1306.2, width: 3519.2, size: 76.691, lh: 1.13, ls: 0.026, unaRiga: true, colore: I }),
           { nome: 'titolo', left: 1324.5, top: 1501.9, width: 1575, align: 'center', lh: 1.05, ls: 0, lines: [
-            riga('sansb', 94.564, ROSSO, 'CONCERT PROGRAM'),
+            riga('sansb', 94.564, I, 'CONCERT PROGRAM'),
           ] },
         ], b)
       },
     },
     // Ledwall, fine serata: ringraziamento con i QR per la recensione e per la prossima serata. Non cambia mai: solo lo sfondo.
     'ledwall-grazie': {
-      w: 4224, h: 4320, plate: 'plate/ledwall-grazie.png',
+      w: 4224, h: 4320, plate: 'plate/ledwall-grazie.png', chiave: 'ledwall-grazie', nativi: NAT_GRAZIE,
       blocchi: function () { var b = []; b.info = { scala: 1, minimo: SCALA_MIN }; return b },
     },
     // Schermi interni 16:9 (3840x2160): nomi su una riga sola e programma in tre colonne
     'interni': {
-      w: 3840, h: 2160, plate: 'plate/interni-2026.png',
+      w: 3840, h: 2160, plate: 'plate/interni-2026.png', chiave: 'interni', nativi: NAT_CHIARO,
       blocchi: function (d, ctx) {
-        var b = programma(d, ctx, { larghezza: 3840, st: ST_INTERNI, ls: 0.039,
+        var I = tinta('interni', NAT_CHIARO).scritte
+        var b = programma(d, ctx, { larghezza: 3840, st: ST_INTERNI, ls: 0.039, colore: I,
           nomi: ['programma 1', 'programma 2', 'programma 3'],
           colonne: [
             { left: 433.9 * K, width: 253.3 * K, top: 466.5 * K, maxY: 880 * K, parte: '1\u00b0 PARTE' },
@@ -297,9 +317,9 @@
             { left: 1232.4 * K, width: 273.8 * K, top: 466.5 * K, maxY: 900 * K, parte: '2\u00b0 PARTE' },
           ] })
         return con([
-          nomi(d, ctx, { left: 420.248 * K, top: 332.604 * K, width: 1079.5 * K, size: 23.525 * K, lh: 1.13, ls: 0.026, unaRiga: true }),
+          nomi(d, ctx, { left: 420.248 * K, top: 332.604 * K, width: 1079.5 * K, size: 23.525 * K, lh: 1.13, ls: 0.026, unaRiga: true, colore: I }),
           { nome: 'titolo', left: 718.4 * K, top: 414.1 * K, width: 483.1 * K, align: 'center', lh: 1.05, ls: 0, lines: [
-            riga('sansb', 29.007 * K, ROSSO, 'CONCERT PROGRAM'),
+            riga('sansb', 29.007 * K, I, 'CONCERT PROGRAM'),
           ] },
         ], b)
       },

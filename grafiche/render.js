@@ -298,6 +298,43 @@
     return { problemi: problemi.filter(function (p, i, a) { return a.indexOf(p) === i }), scala: info.scala == null ? 1 : info.scala, minimo: info.minimo }
   }
 
+  // ---------- ricolorare il fondo ----------
+  // I fondi di Almagreal hanno due soli colori: uno di fondo e uno di «inchiostro» (titolo, figure, logo). Ogni pixel
+  // sta sulla retta fra i due, anche quelli sfumati ai bordi delle lettere: si misura quanto e inchiostro (0..1) e si
+  // ricompone con i due colori scelti. Cosi le sfumature restano pulite e le figure piu tenui restano piu tenui.
+  var tinti = {}
+  var ordineTinti = []
+  function plateTinto(im, src, da, a, w, h) {
+    var k = src + '|' + da.fondo + da.scritte + '|' + a.fondo + a.scritte + '|' + w + 'x' + h
+    if (tinti[k]) return tinti[k]
+    var C = global.GRAFICHE_COLORI
+    var c = document.createElement('canvas')
+    c.width = w
+    c.height = h
+    var x = c.getContext('2d', { willReadFrequently: true })
+    x.drawImage(im, 0, 0, w, h)
+    var dati = x.getImageData(0, 0, w, h)
+    var p = dati.data
+    var f0 = C.rgb(da.fondo), i0 = C.rgb(da.scritte), f1 = C.rgb(a.fondo), i1 = C.rgb(a.scritte)
+    var vx = i0[0] - f0[0], vy = i0[1] - f0[1], vz = i0[2] - f0[2]
+    var vv = vx * vx + vy * vy + vz * vz || 1
+    var dx = i1[0] - f1[0], dy = i1[1] - f1[1], dz = i1[2] - f1[2]
+    for (var n = 0; n < p.length; n += 4) {
+      var q = ((p[n] - f0[0]) * vx + (p[n + 1] - f0[1]) * vy + (p[n + 2] - f0[2]) * vz) / vv
+      if (q < 0) q = 0
+      else if (q > 1) q = 1
+      p[n] = f1[0] + dx * q
+      p[n + 1] = f1[1] + dy * q
+      p[n + 2] = f1[2] + dz * q
+    }
+    x.putImageData(dati, 0, 0)
+    tinti[k] = c
+    ordineTinti.push(k)
+    // le grafiche sono grandi (il ledwall e 4224x4320): se ne tengono in memoria poche, o il telefono si pianta
+    while (ordineTinti.length > 3) delete tinti[ordineTinti.shift()]
+    return c
+  }
+
   // Disegna un modello su un canvas. `modello` = {w, h, plate, blocchi(dati) -> [blocco]}
   function disegna(canvas, modello, dati, opzioni) {
     var scala = (opzioni && opzioni.scala) || 1
@@ -306,7 +343,15 @@
     return Promise.all([caricaFont(), caricaImmagine(global.GRAFICHE_BASE + modello.plate)]).then(function (r) {
       var ctx = canvas.getContext('2d')
       ctx.setTransform(scala, 0, 0, scala, 0, 0)
-      if (global.GRAFICHE_SOLO) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, modello.w, modello.h) } else ctx.drawImage(r[1], 0, 0, modello.w, modello.h)
+      if (global.GRAFICHE_SOLO) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, modello.w, modello.h) }
+      else {
+        var scelto = modello.nativi && global.GRAFICHE_COLORI ? global.GRAFICHE_COLORI.scelta(modello.chiave) : null
+        if (scelto) {
+          // si ricolora alla dimensione a cui si disegna: in anteprima e piccolo e veloce, allo scarico e a misura piena
+          var lw = Math.max(1, Math.round(modello.w * scala)), lh = Math.max(1, Math.round(modello.h * scala))
+          ctx.drawImage(plateTinto(r[1], modello.plate, modello.nativi, scelto, lw, lh), 0, 0, modello.w, modello.h)
+        } else ctx.drawImage(r[1], 0, 0, modello.w, modello.h)
+      }
       if (modello.foto) disegnaFoto(ctx, modello.foto, dati && dati.foto)
       var blocchi = modello.blocchi(dati, ctx)
       blocchi.forEach(function (b) { disegnaBlocco(ctx, b) })
@@ -316,5 +361,5 @@
   }
 
   global.GRAFICHE_BASE = global.GRAFICHE_BASE || 'grafiche/'
-  global.GRAFICHE_RENDER = { caricaFont: caricaFont, caricaImmagine: caricaImmagine, strati: strati, disegna: disegna, disegnaBlocco: disegnaBlocco, rettangoloFoto: rettangoloFoto, impagina: impagina, larghezza: larghezza, FONT: FONT }
+  global.GRAFICHE_RENDER = { caricaFont: caricaFont, plateTinto: plateTinto, caricaImmagine: caricaImmagine, strati: strati, disegna: disegna, disegnaBlocco: disegnaBlocco, rettangoloFoto: rettangoloFoto, impagina: impagina, larghezza: larghezza, FONT: FONT }
 })(window)
