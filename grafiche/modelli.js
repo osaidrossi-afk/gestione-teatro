@@ -5,7 +5,7 @@
 // tutti insieme e sempre con gli stessi font, finché ogni colonna sta nello spazio disponibile.
 (function (global) {
   var BIANCO = '#ffffff'
-  var ROSSO = '#9b0706'
+  var ROSSO = '#9b0707' // il rosso dei template del 17/11/2026
   var T = global.GRAFICHE_TESTI
   var SCALA_MIN = 0.5 // sotto questa dimensione si avverte che i testi sono troppo piccoli
   var MARGINE = 0.012 // come render.js: il testo non si avvicina al bordo più di 12 millesimi della larghezza
@@ -36,9 +36,9 @@
     var r1 = d.ruolo1 === 'Mezzo-soprano' ? 'Mezzo-soprano' : 'Soprano'
     var r2 = d.ruolo2 || 'Baritone'
     return [
-      { it: RUOLI[r1] || r1, en: r1, nome: d.soprano },
-      { it: d.ruoloIt || RUOLI[r2] || r2, en: r2, nome: d.voce2 },
-      { it: 'Piano', en: 'Piano', nome: d.pianista },
+      { ruolo: r1, nome: d.soprano },
+      { ruolo: r2, nome: d.voce2 },
+      { ruolo: 'Piano', nome: d.pianista },
     ]
   }
 
@@ -50,54 +50,58 @@
     return w
   }
 
-  // Nomi degli artisti, uno sotto l'altro (come nei template): ruolo (solo inglese) e nome, in quest'ordine o invertito.
-  // cfg = {left, top, width, align, lh, ls, ruolo, nome, sep, ordine} (misure di Canva, già per la dimensione della grafica).
-  // cfg.ordine: 'ruolo-sopra' (default, il ruolo sopra il nome) oppure 'nome-sopra' (il nome sopra, più in vista — Osaid, 8/11/2026).
-  // Se una riga non entra nel riquadro, tutto il blocco si rimpicciolisce (stessi font) finché entra.
+  // ---------- nomi degli artisti ----------
+  // Come nei template del 17/11/2026: ruolo in grassetto e nome accanto, tutto dello stesso corpo e dello stesso rosso.
+  // Sugli schermi esterni uno per riga; sul ledwall e sugli schermi interni tutti e tre su una riga, separati da « | ».
+  // Se la riga piu lunga non entra nella larghezza del template, tutto il blocco si rimpicciolisce insieme.
   function nomi(d, ctx, cfg) {
-    var lista = artisti(d)
-    var nomeSopra = cfg.ordine === 'nome-sopra'
+    var lista = artisti(d).filter(function (a) { return String(a.nome || '').trim() })
+    var unaRiga = !!cfg.unaRiga
+    var parti = function (a, k, ultimo) {
+      var p = [{ t: a.ruolo + ' ', f: 'serifb', size: cfg.size * k, color: ROSSO },
+        { t: String(a.nome || '').trim(), f: 'serif', size: cfg.size * k, color: ROSSO }]
+      if (unaRiga && !ultimo) p.push({ t: '  |  ', f: 'serif', size: cfg.size * k, color: ROSSO })
+      return p
+    }
     var costruisci = function (k) {
-      var lines = []
-      lista.forEach(function (a, i) {
-        var rigaRuolo = conStrato(riga('serifb', cfg.ruolo * k, BIANCO, a.en), 'r' + (i + 1))
-        var rigaNome = conStrato(riga('sansb', cfg.nome * k, ROSSO, a.nome), 'n' + (i + 1))
-        if (nomeSopra) { lines.push(rigaNome); lines.push(rigaRuolo) } else { lines.push(rigaRuolo); lines.push(rigaNome) }
-        if (i < lista.length - 1) lines.push(riga('serifb', cfg.sep * k, BIANCO, ''))
-      })
-      return lines
+      if (!unaRiga) return lista.map(function (a, i) { return conStrato(riga2(parti(a, k, true)), 'n' + (i + 1)) })
+      var tutte = []
+      lista.forEach(function (a, i) { tutte = tutte.concat(parti(a, k, i === lista.length - 1)) })
+      return [conStrato(riga2(tutte), 'n1')]
     }
     var massima = 0
-    costruisci(1).forEach(function (ln) { if (ln.parts || ln.run.t) massima = Math.max(massima, larghezzaRiga(ctx, ln, cfg.ls || 0)) })
-    // (in Canva il riquadro è largo quanto la riga più lunga: si rimpicciolisce solo se la riga è più larga)
-    var k = massima > cfg.width * 1.01 ? Math.max(0.6, (cfg.width * 1.01) / massima) : 1
-    return { nome: 'nomi', left: cfg.left, top: cfg.top, width: cfg.width, align: cfg.align || 'center', lh: cfg.lh, ls: cfg.ls, lines: costruisci(k) }
+    costruisci(1).forEach(function (ln) { massima = Math.max(massima, larghezzaRiga(ctx, ln, cfg.ls || 0)) })
+    var k = massima > cfg.width ? Math.max(0.55, cfg.width / massima) : 1
+    return { nome: 'nomi', left: cfg.left, top: cfg.top, width: cfg.width, align: 'center', lh: cfg.lh, ls: cfg.ls, lines: costruisci(k) }
   }
 
   // ---------- programma ----------
-  // Una voce dell'elenco → righe. st = {titolo, piccolo} (corpi base), k = riduzione.
+  // L'ordine dei template del 17/11/2026: prima l'OPERA (la piu grande: e il richiamo per il pubblico), poi l'aria tra
+  // virgolette, poi l'autore. Prima era il contrario. st = {opera, aria, autore, vuoto, parte}, k = riduzione.
   function voceRighe(v, st, k) {
-    var t = st.titolo * k, p = st.piccolo * k
-    var vuota = riga('sans', p * (st.vuoto || 1), ROSSO, '')
-    if (v.tipo === 'intervallo') return [riga('sansb', p, ROSSO, '— Interval Drink —'), riga('sans', p, ROSSO, 'Jazz Bar Open'), vuota]
+    var o = st.opera * k, a = st.aria * k, u = st.autore * k
+    var vuota = riga('sans', st.vuoto * k, ROSSO, '')
+    if (v.tipo === 'intervallo') return [riga('sansb', u, ROSSO, '\u2014 Interval Drink \u2014'), riga('sans', u, ROSSO, 'Jazz Bar Open'), vuota]
     if (v.tipo === 'solo') {
       var testo = String(v.testo || 'Piano Solo').split('\n').map(function (x) { return x.trim() }).filter(Boolean)
       var out = []
-      if (testo.length <= 1) out.push(riga('sansb', p, ROSSO, '- ' + (testo[0] || 'Piano Solo') + ' -'))
-      else testo.forEach(function (x) { out.push(riga('sansb', p, ROSSO, x)) })
+      if (testo.length <= 1) out.push(riga('sansb', u, ROSSO, '- ' + (testo[0] || 'Piano Solo') + ' -'))
+      else testo.forEach(function (x) { out.push(riga('sansb', u, ROSSO, x)) })
       out.push(vuota)
       return out
     }
-    var out2 = [riga('serifb', t, BIANCO, T.titolo(v.titolo))]
+    var out2 = []
     var opera = String(v.opera || '').trim()
+    if (opera) out2.push(riga('sansh', o, ROSSO, opera))
+    var titolo = T.titolo(v.titolo)
+    if (titolo) out2.push(riga('serifb', a, ROSSO, titolo))
     var aut = T.autore(v.autore)
-    if (opera) out2.push(riga('sansb', p, ROSSO, opera))
-    if (aut) out2.push(riga('sans', p, ROSSO, 'By ' + aut))
+    if (aut) out2.push(riga('sans', u, ROSSO, 'By ' + aut))
     out2.push(vuota)
     return out2
   }
 
-  // Divide le voci in n colonne di altezza il più possibile uguale, senza cambiare l'ordine (h = altezze).
+  // Divide le voci in n colonne di altezza il piu possibile uguale, senza cambiare l'ordine (h = altezze).
   function dividiFlusso(h, n) {
     var m = h.length
     var gruppi = []
@@ -130,38 +134,42 @@
 
   function da(a, b) { var o = []; for (var i = a; i < b; i++) o.push(i); return o }
 
-  // Prova la dimensione piena e poi sempre più piccola finché tutte le colonne stanno nello spazio.
-  // cfg = {larghezza, st:{titolo,piccolo}, ls, align, colonne:[{left,width,top,maxY}], modo:'intervallo'|'flusso', nomi:[nomi colonne]}
-  //   modo 'intervallo': a sinistra quello che sta prima dell'intervallo, a destra l'intervallo e il resto (due colonne, schermi esterni);
-  //   modo 'flusso': le voci scorrono nelle colonne, che si bilanciano da sole (ledwall e schermi interni).
+  // Le colonne dei template: la PRIMA PARTE (fino all'intervallo compreso) e la SECONDA PARTE, ognuna con la sua
+  // intestazione in corsivo. Sugli schermi esterni sono due colonne; sul ledwall e sugli interni la prima parte si
+  // divide su due colonne e la seconda sta nella terza, com'e disegnato nei template.
+  // Prova la dimensione piena e poi sempre piu piccola finche tutte le colonne stanno nello spazio.
   function programma(d, ctx, cfg) {
     var R = global.GRAFICHE_RENDER
     var voci = d.voci || []
     var margine = cfg.larghezza * MARGINE
     var n = cfg.colonne.length
+    var taglio = voci.findIndex(function (v) { return v.tipo === 'intervallo' })
+    var finePrima = taglio < 0 ? voci.length : taglio + 1 // l'intervallo chiude la prima parte
     var scala = 1
     var blocchi
     for (; scala >= 0.3; scala -= 0.01) {
       var items = voci.map(function (v) { return voceRighe(v, cfg.st, scala) })
+      var sc = scala
+      var intestazione = function (testo) {
+        return [conStrato(riga('serifbi', cfg.st.parte * sc, ROSSO, testo), 'p'), riga('sans', cfg.st.parte * sc, ROSSO, '')]
+      }
+      var prima = da(0, finePrima), seconda = da(finePrima, voci.length)
       var gruppi
-      if (cfg.modo === 'intervallo') {
-        var i = voci.findIndex(function (v) { return v.tipo === 'intervallo' })
-        if (i < 0) i = voci.length
-        gruppi = [da(0, i), da(i, voci.length)]
-      } else {
-        var alte = items.map(function (righe) {
-          return R.impagina(ctx, { left: 0, top: 0, width: cfg.colonne[0].width, align: cfg.align, lh: 1, ls: cfg.ls, lines: righe }).alto
+      if (n <= 2) gruppi = [prima, seconda]
+      else {
+        var alte = prima.map(function (ix) {
+          return R.impagina(ctx, { left: 0, top: 0, width: cfg.colonne[0].width, align: 'center', lh: 1, ls: cfg.ls, lines: items[ix] }).alto
         })
-        gruppi = dividiFlusso(alte, n)
+        var due = dividiFlusso(alte, n - 1)
+        gruppi = [due[0].map(function (i) { return prima[i] }), due[1].map(function (i) { return prima[i] }), seconda]
       }
       blocchi = cfg.colonne.map(function (col, c) {
-        var lines = []
-        // ogni voce è uno «strato» a sé: nel video entrano una dopo l'altra
+        var lines = col.parte ? intestazione(col.parte) : []
         ;(gruppi[c] || []).forEach(function (ix) {
           items[ix].forEach(function (l) { l.strato = 'v' + ix })
           lines = lines.concat(items[ix])
         })
-        return { nome: cfg.nomi[c], left: col.left, top: col.top, width: col.width, align: cfg.align, lh: 1, ls: cfg.ls, maxY: col.maxY, lines: lines }
+        return { nome: cfg.nomi[c], left: col.left, top: col.top, width: col.width, align: 'center', lh: 1, ls: cfg.ls, maxY: col.maxY, lines: lines }
       })
       var entra = blocchi.every(function (b) {
         var r = R.impagina(ctx, b)
@@ -202,125 +210,96 @@
   function nota(t0) {
     return { alfa: rampa(t0, t0 + 0.7, 0, 1), scala: rampa(t0, t0 + 0.95, 0.45, 1, 'rimbalzo'), rot: rampa(t0, t0 + 1.05, -16, 0, 'rimbalzo'), dy: rampa(t0, t0 + 1.1, 70, 0) }
   }
-  var SFONDO_COLORE = '#e99d25' // il colore di fondo dei template (233, 157, 37)
+  var SFONDO_COLORE = '#f5efe3' // il fondo chiaro dei template del 17/11/2026 (245, 239, 227)
   var CAMERA = { scala: rampa(0, 7, 1.05, 1, 'lenta') }
   var FONDO = { alfa: rampa(0, 1.6, 0, 1) }
   var TEMPO = { durata: 15, fine: 7.2 } // l'entrata finisce entro 7 secondi; poi l'immagine resta ferma fino a 15
 
-  // Posizioni delle note (in px della grafica) separate dallo sfondo con crea_note: plate/video/*.png
-  var NOTE_NOMI = [[171, 1275, 215, 357, 3], [1776, 1920, 168, 280, 2], [216, 2929, 336, 413, 1], [1647, 3000, 298, 496, 4]]
-  var NOTE_PROGRAMMA = [[192, 888, 145, 241, 1], [1811, 1453, 203, 339, 3], [1572, 3137, 323, 395, 2]]
-  function livelliNote(nome, elenco, partenza) {
-    return elenco.map(function (n, i) { return { src: 'plate/video/' + nome + '-n' + n[4] + '.png', x: n[0], y: n[1], w: n[2], h: n[3], anim: nota(partenza + i * 0.36) } })
-  }
-
-  var K = 2 // i template esterni e interni sono 1080×1920 e 1920×1080: si disegna al doppio (2160×3840 e 3840×2160)
-  var ESTERNI = { titolo: 40 * K, piccolo: 28 * K }
-  var INTERNI = { titolo: 36.8919 * K, piccolo: 25.8245 * K }
-  var LEDWALL = { titolo: 108, piccolo: 76, vuoto: 1.1 } // un po' più grandi del template (96 e 67): sul ledwall si leggono da lontano. Vuoto largo: più spazio tra un brano e l'altro (Osaid, 4/11/2026)
+  // Misure prese una per una dai template Canva di Almagreal consegnati il 17 novembre 2026 (2a tranche): fondo chiaro al
+  // posto dell'arancione, nomi degli artisti e programma in una grafica sola, OPERA piu grande dell'aria, prima e seconda
+  // parte distinte. I numeri qui sotto sono quelli dei template, moltiplicati per la scala a cui disegniamo.
+  var K = 2 // i template esterni e interni sono 1080x1920 e 1920x1080: si disegna al doppio (2160x3840 e 3840x2160)
+  var ST_ESTERNI = { opera: 34.4899 * K, aria: 29.6398 * K, autore: 27.2215 * K, vuoto: 29.916 * K, parte: 34.4899 * K }
+  var ST_INTERNI = { opera: 22.541 * K, aria: 19.371 * K, autore: 17.79 * K, vuoto: 19.551 * K, parte: 22.541 * K }
+  var ST_LEDWALL = { opera: 81.144, aria: 69.733, autore: 64.043, vuoto: 70.383, parte: 81.144 }
 
   var MODELLI = {
-    // Schermi esterni, verticali 2160x3840 — nomi
-    'esterni-artisti': {
-      w: 2160, h: 3840, plate: 'plate/esterni-nomi.png',
-      video: { plate: 'plate/video/esterni-nomi-fondo.png', w: 2160, h: 3840, bitrate: 8e6, tempo: TEMPO, sfondoColore: SFONDO_COLORE, camera: CAMERA, fondo: FONDO,
-        livelli: livelliNote('esterni-nomi', NOTE_NOMI, 1.0),
-        // gli artisti uno dopo l'altro: prima il ruolo, un attimo dopo il nome
-        anim: function (strati) {
-          var T = { r1: 2.0, n1: 2.45, r2: 3.3, n2: 3.75, r3: 4.6, n3: 5.05 }
-          var m = {}
-          strati.forEach(function (st) { var c = st.nome.split(':')[1]; if (T[c] != null) m[st.nome] = entra(T[c], 1.5) })
-          return m
-        } },
-      blocchi: function (d, ctx) {
-        // Il nome sopra il ruolo, ed è lui il testo grande: il ruolo resta sotto, più piccolo (Osaid, 8/11/2026).
-        return [nomi(d, ctx, { left: 215.1328 * K, top: 552.4221 * K, width: 649.7344 * K, lh: 1.13, ls: 0.026, ordine: 'nome-sopra', nome: 85 * K, ruolo: 55 * K, sep: 85 * K })]
-      },
-    },
-    // Schermi esterni — programma: «CONCERT PROGRAM / TONIGHT 20.30» e due colonne (l'intervallo apre la colonna di destra)
-    'esterni-programma': {
-      w: 2160, h: 3840, plate: 'plate/esterni-prog.png',
-      video: { plate: 'plate/video/esterni-prog-fondo.png', w: 2160, h: 3840, bitrate: 8e6, tempo: TEMPO, sfondoColore: SFONDO_COLORE, camera: CAMERA, fondo: FONDO,
-        livelli: livelliNote('esterni-prog', NOTE_PROGRAMMA, 1.0),
-        // prima «CONCERT PROGRAM» e l'orario, poi i brani a cascata dall'alto, le due colonne quasi insieme (la destra un attimo dopo)
+    // Schermi esterni, verticali 2160x3840: nomi e programma insieme, su due colonne (prima parte a sinistra, seconda a destra)
+    'esterni': {
+      w: 2160, h: 3840, plate: 'plate/esterni-2026.png',
+      video: { plate: 'plate/esterni-2026.png', w: 2160, h: 3840, bitrate: 8e6, tempo: TEMPO, sfondoColore: SFONDO_COLORE, camera: CAMERA, fondo: FONDO,
+        livelli: [],
+        // prima i nomi degli artisti uno sotto l'altro, poi «CONCERT PROGRAM», poi i brani a cascata
         anim: function (strati) {
           var m = {}
-          var per = {}
-          strati.forEach(function (st) { var p = st.nome.split(':'); if (p[1] && p[1].charAt(0) === 'v') per[p[0]] = (per[p[0]] || 0) + 1 })
-          var piu = Math.max(1, Math.max.apply(null, Object.keys(per).map(function (c) { return per[c] }).concat([1])))
-          var passo = piu > 1 ? Math.min(0.3, 2.4 / (piu - 1)) : 0.3
           var contati = {}
           strati.forEach(function (st) {
             var p = st.nome.split(':')
-            if (p[0] === 'titolo') m[st.nome] = entra(p[1] === 't2' ? 2.4 : 1.9, 1.4)
-            else if (p[1] && p[1].charAt(0) === 'v') {
+            if (p[0] === 'nomi') m[st.nome] = entra(1.6 + (Number(String(p[1]).replace('n', '')) - 1) * 0.5, 1.4)
+            else if (p[0] === 'titolo') m[st.nome] = entra(3.2, 1.3)
+            else if (p[1] && (p[1].charAt(0) === 'v' || p[1] === 'p')) {
               var j = contati[p[0]] || 0
               contati[p[0]] = j + 1
-              m[st.nome] = entra((p[0] === 'programma di destra' ? 3.3 : 3.0) + j * passo, 1.3)
+              m[st.nome] = entra((p[0] === 'programma di destra' ? 4.1 : 3.9) + j * 0.16, 1.2)
             }
           })
           return m
         } },
       blocchi: function (d, ctx) {
-        var b = programma(d, ctx, { larghezza: 2160, st: ESTERNI, ls: 0.039, align: 'start', modo: 'intervallo',
+        var b = programma(d, ctx, { larghezza: 2160, st: ST_ESTERNI, ls: 0.039,
           nomi: ['programma di sinistra', 'programma di destra'],
-          colonne: [{ left: 132.3465 * K, width: 398.6808 * K, top: 775.9668 * K, maxY: 1775 * K }, { left: 564.3465 * K, width: 383.307 * K, top: 775.9668 * K, maxY: 1550 * K }] })
+          colonne: [
+            { left: 108 * K, width: 387.596 * K, top: 758.665 * K, maxY: 1700 * K, parte: '1\u00b0 PARTE' },
+            { left: 553.078 * K, width: 418.922 * K, top: 758.665 * K, maxY: 1495 * K, parte: '2\u00b0 PARTE' },
+          ] })
         return con([
-          { nome: 'titolo', left: 116.1499 * K, top: 594.7872 * K, width: 847.7002 * K, align: 'center', lh: 1.05, ls: 0, lines: [
-            conStrato(riga('sansb', 70.987 * K, BIANCO, 'CONCERT PROGRAM'), 't1'),
-            conStrato(riga('sans', 46.2175 * K, BIANCO, quando(d).toUpperCase() + ' ' + d.orario, 1.09, 0.03), 't2'),
+          nomi(d, ctx, { left: 0, top: 481.203 * K, width: 1080 * K, size: 34.6666 * K, lh: 1.36, ls: 0.026 }),
+          { nome: 'titolo', left: 298.329 * K, top: 657.528 * K, width: 483.342 * K, align: 'center', lh: 1.05, ls: 0, lines: [
+            conStrato(riga('sansb', 35.6872 * K, ROSSO, 'CONCERT PROGRAM'), 't1'),
+            conStrato(riga('sans', 25 * K, ROSSO, quando(d).toUpperCase() + ' ' + d.orario, 1.3), 't2'),
           ] },
         ], b)
       },
     },
-    // Tappo per il ledwall (4224x4320): in una grafica sola i nomi degli artisti e il programma (in tre colonne)
-    'ledwall-programma': {
-      w: 4224, h: 4320, plate: 'plate/ledwall.png',
+    // Ledwall 4224x4320: nomi su una riga sola e programma in tre colonne (la prima parte ne occupa due)
+    'ledwall': {
+      w: 4224, h: 4320, plate: 'plate/ledwall-2026.png',
       blocchi: function (d, ctx) {
-        var R = global.GRAFICHE_RENDER
-        var lista = artisti(d)
-        // Gli artisti, uno per riga (ruolo bilingue in bianco + nome in rosso sulla stessa linea): sul ledwall si leggono da lontano, quindi grandi.
-        // Il nome ha più importanza del ruolo e dei titoli dei brani nel programma sotto: è il testo più grande di tutta la grafica (Osaid, 4/11/2026).
-        // Tutti con lo stesso corpo, ridotto solo se la riga più lunga non entra nella larghezza disponibile.
-        var larg = 2650, ruolo = 100, nome = 155, k = 1, massima = 0
-        function parti(a, kk) {
-          return [{ t: a.en + '    ', f: 'serifb', size: ruolo * kk, color: BIANCO },
-            { t: a.nome, f: 'sansb', size: nome * kk, color: ROSSO }]
-        }
-        lista.forEach(function (a) {
-          var w = 0
-          parti(a, 1).forEach(function (p) { w += R.larghezza(ctx, p, p.t, 0.026) })
-          massima = Math.max(massima, w)
-        })
-        if (massima > larg) k = Math.max(0.6, larg / massima)
-        var blocchiNomi = lista.map(function (a, i) {
-          return { nome: 'nomi:' + (i + 1), left: 2112 - larg / 2, top: 1235 + i * 190 * k, width: larg, align: 'center', lh: 1.13, ls: 0.026, lines: [riga2(parti(a, k))] }
-        })
-        var b = programma(d, ctx, { larghezza: 4224, st: LEDWALL, ls: 0.039, align: 'center', modo: 'flusso',
+        var b = programma(d, ctx, { larghezza: 4224, st: ST_LEDWALL, ls: 0.039,
           nomi: ['programma 1', 'programma 2', 'programma 3'],
-          colonne: [{ left: 692.0318, width: 958.972, top: 2050, maxY: 3230 }, { left: 1651.0038, width: 958.972, top: 2050, maxY: 3470 }, { left: 2609.9759, width: 921.9923, top: 2050, maxY: 3230 }] })
-        return con(blocchiNomi.concat([
-          { nome: 'titolo', left: 1112, top: 1880, width: 2000, align: 'center', lh: 1.05, ls: 0, lines: [riga('sansb', 112, BIANCO, 'CONCERT PROGRAM')] },
-        ]), b)
-      },
-    },
-    // Schermi interni, 16:9 (3840x2160) — nomi
-    'wide-artisti': {
-      w: 3840, h: 2160, plate: 'plate/interni-nomi.png',
-      blocchi: function (d, ctx) {
-        return [nomi(d, ctx, { left: 709.7185 * K, top: 415.4998 * K, width: 500.5631 * K, lh: 1.13, ls: 0.026, ruolo: 51.3606 * K, nome: 38.1867 * K, sep: 56.1565 * K })]
-      },
-    },
-    // Schermi interni — programma in quattro colonne
-    'wide-programma': {
-      w: 3840, h: 2160, plate: 'plate/interni-prog.png',
-      blocchi: function (d, ctx) {
-        var b = programma(d, ctx, { larghezza: 3840, st: INTERNI, ls: 0.039, align: 'start', modo: 'flusso',
-          nomi: ['programma 1', 'programma 2', 'programma 3', 'programma 4'],
-          colonne: [284.5658, 622.3, 960, 1297.7].map(function (x, i) { return { left: x * K, width: 313.7 * K, top: 463.3475 * K, maxY: (i === 1 || i === 2 ? 925 : 905) * K } }) })
+          colonne: [
+            { left: 530.1, width: 911.9, top: 1761.3, maxY: 3290, parte: '1\u00b0 PARTE' },
+            { left: 1602.3, width: 946, top: 1918.2, maxY: 3290 },
+            { left: 2708.3, width: 985.6, top: 1761.3, maxY: 3380, parte: '2\u00b0 PARTE' },
+          ] })
         return con([
-          { nome: 'titolo', left: 509.2817 * K, top: 332.6042 * K, width: 901.4367 * K, align: 'center', lh: 1.05, ls: 0, lines: [
-            riga2([{ t: 'CONCERT PROGRAM | ', f: 'sansb', size: 50.6954 * K, color: BIANCO }, { t: quando(d).toUpperCase() + ' ' + d.orario, f: 'sans', size: 50.6954 * K, color: BIANCO }], 1.05),
+          nomi(d, ctx, { left: 352.4, top: 1306.2, width: 3519.2, size: 76.691, lh: 1.13, ls: 0.026, unaRiga: true }),
+          { nome: 'titolo', left: 1324.5, top: 1501.9, width: 1575, align: 'center', lh: 1.05, ls: 0, lines: [
+            riga('sansb', 94.564, ROSSO, 'CONCERT PROGRAM'),
+          ] },
+        ], b)
+      },
+    },
+    // Ledwall, fine serata: ringraziamento con i QR per la recensione e per la prossima serata. Non cambia mai: solo lo sfondo.
+    'ledwall-grazie': {
+      w: 4224, h: 4320, plate: 'plate/ledwall-grazie.png',
+      blocchi: function () { var b = []; b.info = { scala: 1, minimo: SCALA_MIN }; return b },
+    },
+    // Schermi interni 16:9 (3840x2160): nomi su una riga sola e programma in tre colonne
+    'interni': {
+      w: 3840, h: 2160, plate: 'plate/interni-2026.png',
+      blocchi: function (d, ctx) {
+        var b = programma(d, ctx, { larghezza: 3840, st: ST_INTERNI, ls: 0.039,
+          nomi: ['programma 1', 'programma 2', 'programma 3'],
+          colonne: [
+            { left: 433.9 * K, width: 253.3 * K, top: 466.5 * K, maxY: 880 * K, parte: '1\u00b0 PARTE' },
+            { left: 828.6 * K, width: 262.8 * K, top: 510.1 * K, maxY: 830 * K },
+            { left: 1232.4 * K, width: 273.8 * K, top: 466.5 * K, maxY: 900 * K, parte: '2\u00b0 PARTE' },
+          ] })
+        return con([
+          nomi(d, ctx, { left: 420.248 * K, top: 332.604 * K, width: 1079.5 * K, size: 23.525 * K, lh: 1.13, ls: 0.026, unaRiga: true }),
+          { nome: 'titolo', left: 718.4 * K, top: 414.1 * K, width: 483.1 * K, align: 'center', lh: 1.05, ls: 0, lines: [
+            riga('sansb', 29.007 * K, ROSSO, 'CONCERT PROGRAM'),
           ] },
         ], b)
       },

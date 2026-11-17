@@ -8,8 +8,11 @@
     // asc/desc sono le metriche del font; a = dove cade la linea di base in una riga con interlinea 1 (in frazione del corpo, misurato sui template di Canva).
     // Con interlinea maggiore di 1, circa un sesto dello spazio in più sta sopra il testo (EXTRA): base = alto + (a + EXTRA × (interlinea − 1)) × corpo.
     serifb: { css: 'Noto Serif', style: 'normal', weight: 700, asc: 1.069, desc: 0.293, a: 0.95 },
+    serif: { css: 'Noto Serif', style: 'normal', weight: 400, asc: 1.069, desc: 0.293, a: 0.95 },
+    serifbi: { css: 'Noto Serif', style: 'italic', weight: 700, asc: 1.069, desc: 0.293, a: 0.95 },
     serifi: { css: 'Noto Serif', style: 'italic', weight: 400, asc: 1.069, desc: 0.293, a: 0.95 },
     sansb: { css: 'Roboto', style: 'normal', weight: 700, asc: 0.928, desc: 0.244, a: 0.893 },
+    sansh: { css: 'Roboto', style: 'normal', weight: 900, asc: 0.928, desc: 0.244, a: 0.893 },
     sans: { css: 'Roboto', style: 'normal', weight: 400, asc: 0.928, desc: 0.244, a: 0.893 },
     sansi: { css: 'Roboto', style: 'italic', weight: 400, asc: 0.928, desc: 0.244, a: 0.893 },
     sansbi: { css: 'Roboto', style: 'italic', weight: 700, asc: 0.928, desc: 0.244, a: 0.893 },

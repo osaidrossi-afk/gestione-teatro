@@ -12,7 +12,7 @@
   var soloScarica = partiHash.indexOf('v=scarica') !== -1 && !!dataDaLink
   var $ = function (id) { return document.getElementById(id) }
   var T = window.GRAFICHE_TESTI
-  var tabCorrente = 'esterni-artisti'
+  var tabCorrente = 'esterni'
   var gettone = 0
   var attesaAnteprima = null
   var attesaSalva = null
@@ -22,11 +22,10 @@
   var BOZZA = 'grafiche-bozza-3'
 
   var TABS = [
-    { id: 'esterni-artisti', nome: 'Esterni · nomi', file: 'esterni-nomi', modello: function () { return 'esterni-artisti' } },
-    { id: 'programma', nome: 'Esterni · programma', file: 'esterni-programma', modello: function () { return 'esterni-programma' } },
-    { id: 'ledwall', nome: 'Ledwall · nomi e programma', file: 'ledwall-tappo', modello: function () { return 'ledwall-programma' } },
-    { id: 'interni', nome: 'Interni · nomi', file: 'interni-nomi', modello: function () { return 'wide-artisti' } },
-    { id: 'interni-programma', nome: 'Interni · programma', file: 'interni-programma', modello: function () { return 'wide-programma' } },
+    { id: 'esterni', nome: 'Esterni', file: 'esterni', modello: function () { return 'esterni' } },
+    { id: 'ledwall', nome: 'Ledwall', file: 'ledwall-tappo', modello: function () { return 'ledwall' } },
+    { id: 'ledwall-grazie', nome: 'Ledwall · ringraziamento', file: 'ledwall-ringraziamento', modello: function () { return 'ledwall-grazie' } },
+    { id: 'interni', nome: 'Interni', file: 'interni', modello: function () { return 'interni' } },
   ]
 
   function el(tag, classe, testo) {
