@@ -212,7 +212,7 @@
 
   function scriviForm(d) {
     $('orario').value = d.orario || '20.30'
-    $('ruolo1').value = d.ruolo1 === 'Mezzo-soprano' ? 'Mezzo-soprano' : 'Soprano'
+    $('ruolo1').value = ['Mezzo-soprano', 'Tenor', 'Baritone'].indexOf(d.ruolo1) >= 0 ? d.ruolo1 : 'Soprano'
     $('soprano').value = d.soprano || ''
     $('ruolo2').value = ['Tenor', 'Baritone', 'Bass-baritone', 'Bass', 'Countertenor'].indexOf(d.ruolo2) >= 0 ? d.ruolo2 : 'Tenor'
     $('voce2').value = d.voce2 || ''
@@ -410,7 +410,7 @@
     var data = $('data').value
     if (caricando || soloScarica) return Promise.resolve(false)
     if (!data || !String(d.soprano).trim()) {
-      if (!silenzioso) messaggio('Scrivi almeno il giorno e il nome del soprano per salvare.', 'attenzione')
+      if (!silenzioso) messaggio('Scrivi almeno il giorno e il nome della prima voce per salvare.', 'attenzione')
       return Promise.resolve(false)
     }
     return chiamata('grafiche_salva', { chiave: chiave, la_data: data, i_dati: d, chi: $('chisei').value || null }).then(function (r) {

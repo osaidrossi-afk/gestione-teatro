@@ -35,7 +35,7 @@
   function conStrato(r, nome) { r.strato = nome; return r }
 
   function artisti(d) {
-    var r1 = d.ruolo1 === 'Mezzo-soprano' ? 'Mezzo-soprano' : 'Soprano'
+    var r1 = ['Mezzo-soprano', 'Tenor', 'Baritone'].indexOf(d.ruolo1) >= 0 ? d.ruolo1 : 'Soprano'
     var r2 = d.ruolo2 || 'Baritone'
     return [
       { ruolo: r1, nome: d.soprano },
@@ -138,8 +138,8 @@
   function da(a, b) { var o = []; for (var i = a; i < b; i++) o.push(i); return o }
 
   // Le colonne dei template: la PRIMA PARTE (fino all'intervallo compreso) e la SECONDA PARTE, ognuna con la sua
-  // intestazione in corsivo. Sugli schermi esterni sono due colonne; sul ledwall e sugli interni la prima parte si
-  // divide su due colonne e la seconda sta nella terza, com'e disegnato nei template.
+  // intestazione in corsivo. Con due colonne (schermi esterni e ledwall) la prima parte sta a sinistra e la seconda a
+  // destra; con più colonne (schermi interni) ogni parte ne prende in proporzione a quanto è lunga.
   // Prova la dimensione piena e poi sempre piu piccola finche tutte le colonne stanno nello spazio.
   function programma(d, ctx, cfg) {
     var R = global.GRAFICHE_RENDER
@@ -291,20 +291,21 @@
         ], b)
       },
     },
-    // Ledwall 4224x4320: nomi su una riga sola e programma in tre colonne (la prima parte ne occupa due)
+    // Ledwall 4224x4320: nomi su una riga sola e programma in due colonne, 1a parte a sinistra e 2a a destra
     'ledwall': {
       w: 4224, h: 4320, plate: 'plate/ledwall-2026.png', chiave: 'ledwall', nativi: NAT_LEDWALL,
       blocchi: function (d, ctx) {
         var I = tinta('ledwall', NAT_LEDWALL).scritte
         var b = programma(d, ctx, { larghezza: 4224, st: ST_LEDWALL, ls: 0.039, colore: I,
-          nomi: ['programma 1', 'programma 2', 'programma 3'], parti: ['1\u00b0 PARTE', '2\u00b0 PARTE'],
-            // Il fondo del ledwall e invertito (17/11/2026): il testo e color crema come le figure in basso, quindi le
-            // colonne si fermano PRIMA di toccarle, altrimenti si confondono. Misurato sul fondo: le figure cominciano
-            // a y 3169 sotto la prima e la terza colonna, a 3514 sotto quella centrale.
+          nomi: ['programma di sinistra', 'programma di destra'], parti: ['1\u00b0 PARTE', '2\u00b0 PARTE'],
+            // Due colonne uguali e simmetriche (Cristiano, 20/11/2026: con tre, la 1a parte finiva spezzata su due colonne
+            // e la 2a tutta da un lato). Il fondo e invertito: il testo e color crema come le figure in basso, quindi le
+            // colonne si fermano PRIMA di toccarle. Misurato sul fondo a fasce di 100 px: le braccia delle figure salgono
+            // fino a y 3172 solo vicino ai bordi (x < 800 e x > 3420); tra x 800 e 3420 cominciano da 3516 in giu (il
+            // logo al centro). Per questo le colonne stanno tra 800 e 3424 e scendono fino a 3470.
           colonne: [
-            { left: 530.1, width: 911.9, top: 1761.3, maxY: 3150 },
-            { left: 1602.3, width: 946, top: 1918.2, maxY: 3490 },
-            { left: 2708.3, width: 985.6, top: 1761.3, maxY: 3150 },
+            { left: 800, width: 1212, top: 1761.3, maxY: 3470 },
+            { left: 2212, width: 1212, top: 1761.3, maxY: 3470 },
           ] })
         return con([
           nomi(d, ctx, { left: 352.4, top: 1306.2, width: 3519.2, size: 76.691, lh: 1.13, ls: 0.026, unaRiga: true, colore: I }),
