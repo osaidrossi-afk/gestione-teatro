@@ -141,13 +141,17 @@
   // intestazione in corsivo. Con due colonne (schermi esterni e ledwall) la prima parte sta a sinistra e la seconda a
   // destra; con più colonne (schermi interni) ogni parte ne prende in proporzione a quanto è lunga.
   // Prova la dimensione piena e poi sempre piu piccola finche tutte le colonne stanno nello spazio.
+  // cfg.intervalloInMezzo: l'intervallo esce dalla prima colonna e va al centro, sulla riga di «1° PARTE» e «2° PARTE».
+  // cfg.equilibra: le due colonne finiscono alla stessa altezza (vedi equilibra).
   function programma(d, ctx, cfg) {
     var R = global.GRAFICHE_RENDER
-    var voci = d.voci || []
+    var tutte = d.voci || []
     var margine = cfg.larghezza * MARGINE
     var n = cfg.colonne.length
-    var taglio = voci.findIndex(function (v) { return v.tipo === 'intervallo' })
-    var finePrima = taglio < 0 ? voci.length : taglio + 1 // l'intervallo chiude la prima parte
+    var taglio = tutte.findIndex(function (v) { return v.tipo === 'intervallo' })
+    var inMezzo = cfg.intervalloInMezzo && n === 2 && taglio >= 0 && taglio < tutte.length - 1 ? tutte[taglio] : null
+    var voci = inMezzo ? tutte.slice(0, taglio).concat(tutte.slice(taglio + 1)) : tutte
+    var finePrima = inMezzo ? taglio : taglio < 0 ? voci.length : taglio + 1 // l'intervallo chiude la prima parte
     var scala = 1
     var blocchi
     for (; scala >= 0.3; scala -= 0.01) {
@@ -155,7 +159,8 @@
       var sc = scala
       var intestazione = function (testo) {
         var C = cfg.colore || ROSSO
-        return [conStrato(riga('serifbi', cfg.st.parte * sc, C, testo), 'p'), riga('sans', cfg.st.parte * sc, C, '')]
+        // con l'intervallo al centro, sotto i titoli c'e piu aria: le sue due righe non devono toccare il primo brano
+        return [conStrato(riga('serifbi', cfg.st.parte * sc, C, testo), 'p'), riga('sans', cfg.st.parte * sc * (inMezzo ? 1.8 : 1), C, '')]
       }
       var larga = cfg.colonne[0].width
       var alta = function (ix) {
@@ -177,11 +182,14 @@
         // «1° PARTE» sulla prima colonna della prima parte, «2° PARTE» sulla prima della seconda
         var eti = c === 0 ? cfg.parti[0] : (c === nPrima && seconda.length ? cfg.parti[1] : null)
         var lines = eti ? intestazione(eti) : []
+        var confini = [] // dove finisce ogni voce (indice nelle righe): li equilibra puo allargare lo spazio
+        var dopoTesta = lines.length
         ;(gruppi[c] || []).forEach(function (ix) {
           items[ix].forEach(function (l) { l.strato = 'v' + ix })
           lines = lines.concat(items[ix])
+          confini.push(lines.length)
         })
-        return { nome: cfg.nomi[c], left: col.left, top: col.top, width: col.width, align: 'center', lh: 1, ls: cfg.ls, maxY: col.maxY, lines: lines }
+        return { nome: cfg.nomi[c], left: col.left, top: col.top, width: col.width, align: 'center', lh: 1, ls: cfg.ls, maxY: col.maxY, lines: lines, confini: confini, dopoTesta: dopoTesta }
       })
       var entra = blocchi.every(function (b) {
         var r = R.impagina(ctx, b)
@@ -189,8 +197,42 @@
       })
       if (entra) break
     }
+    if (cfg.equilibra && n === 2) equilibra(ctx, blocchi, cfg.st.vuoto * scala, cfg.colore || ROSSO)
+    if (inMezzo) {
+      // centrato tra le due colonne, con la linea di base allineata a quella di «1° PARTE» / «2° PARTE»
+      var c0 = cfg.colonne[0], c1 = cfg.colonne[1]
+      var centro = (c0.left + c0.width + c1.left) / 2
+      var largo = cfg.intervalloInMezzo.width
+      var righeInt = voceRighe(inMezzo, cfg.st, scala, cfg.colore || ROSSO).slice(0, 2)
+      righeInt.forEach(function (l) { l.strato = 'intervallo' })
+      var alto = c0.top + (R.FONT.serifbi.a * cfg.st.parte - R.FONT.sansb.a * cfg.st.autore) * scala
+      blocchi.push({ nome: 'intervallo', left: centro - largo / 2, top: alto, width: largo, align: 'center', lh: 1, ls: cfg.ls, maxY: c0.maxY, lines: righeInt })
+    }
     blocchi.info = { scala: Math.round(scala * 100) / 100, minimo: SCALA_MIN }
     return blocchi
+  }
+
+  // Pareggia le due colonne del programma (tappo LEDwall, Osaid 22/11/2026: «il programma deve sempre avere un
+  // equilibrio»). Il testo resta della stessa grandezza nelle due colonne; la piu corta allarga lo spazio tra una voce
+  // e l'altra fino a finire alla stessa altezza dell'altra. Lo spazio tra due voci cresce al massimo di MAX_SPAZIO volte
+  // quello normale: se non basta, il resto si divide sopra e sotto e la colonna corta resta centrata rispetto all'altra.
+  // Le voci non cambiano mai parte ne ordine.
+  var MAX_SPAZIO = 2
+  function equilibra(ctx, blocchi, spazioNormale, colore) {
+    var R = global.GRAFICHE_RENDER
+    var fine = blocchi.map(function (b) { return b.lines.length ? R.impagina(ctx, b).fine : null })
+    if (fine[0] == null || fine[1] == null) return
+    var corta = fine[0] < fine[1] ? blocchi[0] : blocchi[1]
+    var d = Math.abs(fine[0] - fine[1])
+    if (d < spazioNormale * 0.25) return
+    var tagli = corta.confini.slice(0, -1) // dopo ogni voce tranne l'ultima
+    var piu = tagli.length ? Math.min(d / tagli.length, MAX_SPAZIO * spazioNormale) : 0
+    var resto = d - piu * tagli.length
+    var spazio = function (h) { return riga('sans', h, colore, '') }
+    var lines = corta.lines.slice()
+    for (var i = tagli.length - 1; i >= 0; i--) if (piu > 0) lines.splice(tagli[i], 0, spazio(piu))
+    if (resto > 1) lines.splice(corta.dopoTesta, 0, spazio(resto / 2))
+    corta.lines = lines
   }
 
   function con(testa, b) {
@@ -298,6 +340,8 @@
         var I = tinta('ledwall', NAT_LEDWALL).scritte
         var b = programma(d, ctx, { larghezza: 4224, st: ST_LEDWALL, ls: 0.039, colore: I,
           nomi: ['programma di sinistra', 'programma di destra'], parti: ['1\u00b0 PARTE', '2\u00b0 PARTE'],
+          // Solo qui (Osaid 22/11/2026): \u00abInterval Drink\u00bb al centro tra \u00ab1\u00b0 PARTE\u00bb e \u00ab2\u00b0 PARTE\u00bb, colonne pareggiate.
+          intervalloInMezzo: { width: 900 }, equilibra: true,
             // Due colonne uguali e simmetriche (Cristiano, 20/11/2026: con tre, la 1a parte finiva spezzata su due colonne
             // e la 2a tutta da un lato). Il fondo e invertito: il testo e color crema come le figure in basso, quindi le
             // colonne si fermano PRIMA di toccarle. Misurato sul fondo a fasce di 100 px: le braccia delle figure salgono
