@@ -82,8 +82,8 @@
     progress { width: 100%; height: 12px; margin-top: 10px; accent-color: var(--accent); }
     details summary { cursor: pointer; font-size: 14px; font-weight: 600; padding: 6px 0; }
     .solo-scarica .modifica { display: none !important; }
-    #colori-box { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; background: var(--campo); }
-    #colori-box summary { padding: 4px 0; }
+    .colori-box { border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; margin-bottom: 10px; background: var(--campo); }
+    .colori-box summary { padding: 4px 0; }
     .tavolozza { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; margin: 8px 0 2px; }
     .tavolozza button { padding: 0; border-radius: 10px; overflow: hidden; border: 2px solid var(--line); background: none; }
     .tavolozza button[aria-pressed="true"] { border-color: var(--accent); }
@@ -194,40 +194,12 @@
           </div>
           <div id="quando-stato" class="controllo" role="status" hidden></div>
         </div>
-        <details id="colori-box">
-          <summary>Cambia i colori di questa grafica</summary>
-          <p class="fisso">Ogni grafica ha tre colori: il fondo, il titolo con le figure, e le scritte che aggiungiamo noi (nomi e programma).
-            Nel ledwall gli ultimi due non sono uguali, come li ha fatti Almagreal: scegliendo colori pronti la differenza resta.
-            Puoi anche scrivere il codice di ognuno. La scelta resta in questo telefono o computer e vale per le immagini che scarichi da qui.</p>
-          <div class="tavolozza" id="tavolozza" role="group" aria-label="Colori pronti"></div>
-          <div class="su-misura">
-            <div>
-              <label for="hex-fondo">Codice del fondo</label>
-              <div class="codice">
-                <input id="hex-fondo" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#f5efe3" maxlength="7" />
-                <input id="pick-fondo" type="color" aria-label="Scegli il colore del fondo" />
-              </div>
-            </div>
-            <div>
-              <label for="hex-titolo">Codice del titolo e delle figure</label>
-              <div class="codice">
-                <input id="hex-titolo" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#7c3d36" maxlength="7" />
-                <input id="pick-titolo" type="color" aria-label="Scegli il colore del titolo e delle figure" />
-              </div>
-            </div>
-            <div>
-              <label for="hex-scritte">Codice di nomi e programma</label>
-              <div class="codice">
-                <input id="hex-scritte" type="text" inputmode="latin" autocomplete="off" spellcheck="false" placeholder="#9b0707" maxlength="7" />
-                <input id="pick-scritte" type="color" aria-label="Scegli il colore delle scritte" />
-              </div>
-            </div>
-          </div>
-          <div class="azioni">
-            <button type="button" id="colori-tutte">Usa questi colori su tutte le grafiche</button>
-            <button type="button" id="colori-originale">Rimetti i colori di partenza (tutte)</button>
-          </div>
-          <div id="colori-stato" class="controllo" role="status" hidden></div>
+        <details id="colori-box" class="colori-box">
+          <summary>Colori di Voci d'Italia (tutte le grafiche insieme)</summary>
+          <p class="fisso">Un colore solo per tutte le grafiche di Voci d'Italia della serata: esterni, ledwall, ringraziamento, interni e locandina.
+            Sceglilo qui e cambiano tutte insieme. Resta salvato con la serata, quindi lo vede anche chi apre la pagina da un altro telefono.
+            «Giallo Almagreal» è il colore originale della locandina.</p>
+          <div class="pannello-colori"></div>
         </details>
         <div class="tab" id="tab" role="group" aria-label="Quale grafica vedere"></div>
         <div class="anteprima-box"><canvas id="anteprima" class="anteprima" aria-label="Anteprima della grafica"></canvas><div class="caricamento" id="caricamento"></div></div>
@@ -280,6 +252,12 @@
         <div class="raccolta" id="loc-raccolta" role="group" aria-labelledby="loc-raccolta-titolo"></div>
         <label for="loc-zoom">Ingrandimento <small>(trascina la foto nell'anteprima per spostarla)</small></label>
         <input id="loc-zoom" type="range" min="1" max="3" step="0.01" value="1" />
+        <details id="loc-colori-box" class="colori-box">
+          <summary>Colori della locandina</summary>
+          <p class="fisso">La locandina di Voci d'Italia ha lo stesso colore delle altre grafiche di Voci d'Italia: cambiandolo qui cambiano anche loro.
+            Quella di Behind the Curtain ha il suo. Il colore resta salvato con la serata.</p>
+          <div class="pannello-colori"></div>
+        </details>
         <div class="anteprima-box"><canvas id="loc-anteprima" class="anteprima" aria-label="Anteprima della locandina"></canvas></div>
         <div class="azioni"><button type="button" class="primario" id="loc-scarica">Scarica la locandina (PNG)</button></div>
         <div id="loc-msg" class="msg" role="status" hidden></div>

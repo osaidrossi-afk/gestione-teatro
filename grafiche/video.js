@@ -62,7 +62,7 @@
       var sfondo = r[1]
       // Lo sfondo del video deve avere gli stessi colori dell'immagine: se chi scarica ne ha scelti altri si ricolora
       // qui come in render.js, altrimenti il video verrebbe col fondo di Almagreal e i testi del colore nuovo.
-      var scelto = daImmagine && modello.nativi && global.GRAFICHE_COLORI ? global.GRAFICHE_COLORI.scelta(modello.chiave) : null
+      var scelto = daImmagine && modello.nativi && global.GRAFICHE_COLORI ? global.GRAFICHE_COLORI.scelta(modello.chiave, modello.nativi) : null
       if (scelto) sfondo = R.plateTinto(sfondo, spec.plate, modello.nativi, scelto, W, H)
       var immaginiLivelli = r[2]
       var tempo = spec.tempo || { durata: sfondo.duration, fine: sfondo.duration - 0.03 }

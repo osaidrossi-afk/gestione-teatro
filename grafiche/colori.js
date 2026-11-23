@@ -2,13 +2,18 @@
 // delle figure (stampati nel PNG) e il colore delle scritte che aggiungiamo noi (nomi e programma). Nel ledwall quei
 // due non coincidono — misurati sul template: titolo bordeaux #7c3d36, programma rosso #9b0707 — e la distinzione va
 // tenuta. Il fondo PNG si ricolora pixel per pixel (vedi render.js), le scritte si disegnano col terzo colore.
-// La scelta è di chi scarica, resta nel suo telefono o computer, e non cambia nulla per gli altri.
+// Un colore per esperienza (Osaid, 23/11/2026: «mantenere sempre lo stesso colore allineato»): tutte le grafiche di
+// Voci d'Italia (esterni, ledwall, ringraziamento, interni, locandina) ne hanno uno, la locandina di Behind the
+// Curtain un altro. Sta nei dati della serata (dati.colori, salvato con grafiche_colori): lo vede chiunque apra la pagina.
 (function (global) {
-  var CHIAVE = 'grafiche-colori'
 
   // Colori pronti: fondo + scritte. Il colore del titolo e delle figure segue il template (vedi titoloPer):
   // dove Almagreal lo ha fatto diverso dal testo, resta diverso.
+  // I primi due sono esattamente quelli di Almagreal: il giallo della locandina di Voci d'Italia e il rosa di quella
+  // di Behind the Curtain, misurati sui loro PNG (titolo e scritte dello stesso colore del template, non smorzati).
   var PRONTI = [
+    { nome: 'Giallo Almagreal', fondo: '#e99d25', scritte: '#9b0707', titolo: '#9b0707' },
+    { nome: 'Rosa Almagreal', fondo: '#efa0a0', scritte: '#130a80', titolo: '#00007e' },
     { nome: 'Rosso su crema', fondo: '#f5efe3', scritte: '#9b0707' },
     { nome: 'Crema su rosso', fondo: '#9b0707', scritte: '#f6f0e4' },
     { nome: 'Bordeaux su crema', fondo: '#f5efe3', scritte: '#7c3d36' },
@@ -80,43 +85,31 @@
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
   }
 
-  function leggiTutte() {
-    try {
-      var v = JSON.parse(localStorage.getItem(CHIAVE) || '{}')
-      return v && typeof v === 'object' ? v : {}
-    } catch (e) { return {} }
-  }
-  function salvaTutte(v) {
-    try { localStorage.setItem(CHIAVE, JSON.stringify(v)) } catch (e) { /* telefono senza memoria: pazienza */ }
+  // Quale esperienza segue ogni grafica: la locandina di Behind the Curtain ha il suo colore, tutto il resto e Voci d'Italia.
+  function esperienzaDi(chiave) { return chiave === 'locandina-btc' ? 'btc' : 'voci' }
+
+  // null = la grafica resta com'e nel template di Almagreal.
+  var stato = { voci: null, btc: null }
+
+  function pulisciCoppia(c) {
+    if (!c) return null
+    var f = pulisci(c.fondo), s = pulisci(c.scritte), t = pulisci(c.titolo)
+    return f && s ? { fondo: f, scritte: s, titolo: t || null } : null
   }
 
-  // null = la grafica resta com'è nel template di Almagreal.
-  function scelta(modello) {
-    var v = leggiTutte()[modello]
-    if (!v) return null
-    var f = pulisci(v.fondo), s = pulisci(v.scritte), ti = pulisci(v.titolo)
-    if (!f || !s) return null
-    return { fondo: f, titolo: ti || s, scritte: s }
+  // I colori della serata, come arrivano da dati.colori.
+  function imposta(colori) {
+    stato = { voci: pulisciCoppia(colori && colori.voci), btc: pulisciCoppia(colori && colori.btc) }
   }
+  function tutte() { return { voci: stato.voci, btc: stato.btc } }
+  function coppia(esperienza) { return stato[esperienza] }
+  function cambia(esperienza, c) { stato[esperienza] = pulisciCoppia(c) }
 
-  function imposta(modello, terna) {
-    var v = leggiTutte()
-    if (!terna) delete v[modello]
-    else {
-      var f = pulisci(terna.fondo), s = pulisci(terna.scritte), ti = pulisci(terna.titolo)
-      if (!f || !s) return false
-      v[modello] = { fondo: f, titolo: ti || s, scritte: s }
-    }
-    salvaTutte(v)
-    return true
-  }
-
-  // modelli = [{chiave, nativi}]: ognuno tiene il suo rapporto fra titolo e testo.
-  function impostaTutti(modelli, coppia) {
-    modelli.forEach(function (m) {
-      imposta(m.chiave, coppia && { fondo: coppia.fondo, scritte: coppia.scritte,
-        titolo: titoloPer(m.nativi, coppia.fondo, coppia.scritte) })
-    })
+  // Fondo, titolo e scritte di una grafica: il titolo, se non e stato scelto, segue il template (vedi titoloPer).
+  function scelta(chiave, nativi) {
+    var c = stato[esperienzaDi(chiave)]
+    if (!c) return null
+    return { fondo: c.fondo, scritte: c.scritte, titolo: c.titolo || titoloPer(nativi, c.fondo, c.scritte) }
   }
 
   global.GRAFICHE_COLORI = {
@@ -129,6 +122,9 @@
     luminosita: luminosita,
     scelta: scelta,
     imposta: imposta,
-    impostaTutti: impostaTutti,
+    tutte: tutte,
+    coppia: coppia,
+    cambia: cambia,
+    esperienzaDi: esperienzaDi,
   }
 })(window)

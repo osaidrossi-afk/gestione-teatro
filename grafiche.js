@@ -206,7 +206,7 @@
   function leggiForm() {
     return {
       orario: $('orario').value, quando: $('quando').value, ruolo1: $('ruolo1').value, soprano: $('soprano').value, ruolo2: $('ruolo2').value, voce2: $('voce2').value,
-      pianista: $('pianista').value, nomi: 'sinistra', voci: leggiVoci(),
+      pianista: $('pianista').value, nomi: 'sinistra', voci: leggiVoci(), colori: window.GRAFICHE_COLORI.tutte(),
     }
   }
 
@@ -219,6 +219,8 @@
     $('pianista').value = d.pianista || ''
     $('quando').value = d.quando === 'Tomorrow' ? 'Tomorrow' : 'Tonight'
     scriviVoci(Array.isArray(d.voci) && d.voci.length ? d.voci : vociIniziali())
+    window.GRAFICHE_COLORI.imposta(d.colori)
+    if (pannelliPronti) aggiornaColori()
   }
 
   // Se la serata è domani (o più in là) il titolo diventa «Tomorrow», altrimenti «Tonight»; si può sempre cambiare a mano.
@@ -270,7 +272,7 @@
   function qrStorti() {
     var m = modelloDi(tabAttuale())
     if (!m || m.chiave !== 'ledwall-grazie') return false
-    var c = window.GRAFICHE_COLORI.scelta(m.chiave)
+    var c = window.GRAFICHE_COLORI.scelta(m.chiave, m.nativi)
     if (!c) return false
     return window.GRAFICHE_COLORI.luminosita(c.fondo) < window.GRAFICHE_COLORI.luminosita(c.scritte)
   }
@@ -680,6 +682,7 @@
         locAggiornaCampo()
         locRaccolta()
         locDisegna()
+        aggiornaColori()
       })
       box.appendChild(b)
     })
@@ -838,81 +841,144 @@
   }
 
   // ---------- colori ----------
-  // Ogni grafica e fatta di due colori: il fondo del template e l'inchiostro (titolo, figure, nomi, programma).
-  // Qui si cambiano: coppie pronte, oppure il codice scritto a mano. La scelta resta nel telefono di chi scarica
-  // (colori.js) e vale per le immagini che scarica da qui; non cambia la serata ne quello che vedono gli altri.
-  function coppiaAttuale() {
-    var m = modelloDi(tabAttuale())
-    return (window.GRAFICHE_COLORI.scelta(m.chiave) || m.nativi) || null
+  // Un colore per esperienza, salvato con la serata (colori.js, grafiche_colori): scegliendolo cambiano insieme tutte
+  // le grafiche di quell'esperienza, per chiunque apra la pagina. Due riquadri uguali: sopra le grafiche (Voci
+  // d'Italia) e tra le locandine (segue la locandina aperta: Voci d'Italia o Behind the Curtain).
+  var pannelliPronti = false
+  var PANNELLI = [
+    { box: 'colori-box', esperienza: function () { return 'voci' }, modello: function () { return modelloDi(tabAttuale()) } },
+    { box: 'loc-colori-box', esperienza: function () { return locCorrente === 'btc' ? 'btc' : 'voci' },
+      modello: function () { return window.GRAFICHE_MODELLI[locAttuale().modello] } },
+  ]
+  var NOMI_ESPERIENZA = { voci: 'Voci d’Italia', btc: 'Behind the Curtain' }
+
+  // I colori che la grafica ha adesso: quelli scelti, o quelli del template di Almagreal.
+  function ternaDi(m) { return window.GRAFICHE_COLORI.scelta(m.chiave, m.nativi) || m.nativi }
+
+  function salvaColori() {
+    return chiamata('grafiche_colori', { chiave: chiave, la_data: $('data').value, i_colori: window.GRAFICHE_COLORI.tutte() })
+      .catch(function (e) {
+        // serata non ancora salvata: si salva adesso, e i colori partono con lei
+        if (soloScarica || (e && e.message === 'chiave')) throw e
+        return salva(true).then(function (ok) { if (!ok) throw new Error('non salvata') })
+      })
   }
 
-  function modelliConColori() {
-    return TABS.map(function (x) { return modelloDi(x) }).filter(function (m) { return m.nativi })
-  }
-
-  function cambiaColori(terna) {
-    var m = modelloDi(tabAttuale())
-    if (!m.nativi) return
-    window.GRAFICHE_COLORI.imposta(m.chiave, terna)
+  function cambiaColori(esperienza, coppia) {
+    window.GRAFICHE_COLORI.cambia(esperienza, coppia)
     aggiornaColori()
     anteprima(0)
+    locDisegna()
+    salvaColori().then(function () {
+      messaggio(coppia ? 'Colori di ' + NOMI_ESPERIENZA[esperienza] + ' cambiati su tutte le sue grafiche e salvati con la serata.'
+        : 'Grafiche di ' + NOMI_ESPERIENZA[esperienza] + ' tornate ai colori di Almagreal.', 'ok')
+    }).catch(function () {
+      messaggio('I colori sono cambiati qui, ma non sono riuscito a salvarli con la serata' + (soloScarica ? ': riprova.' : ': si salveranno appena scrivi la prima voce.'), 'attenzione')
+    })
   }
 
-  function aggiornaColori() {
-    var box = $('colori-box')
-    var m = modelloDi(tabAttuale())
-    if (!m || !m.nativi) { box.hidden = true; return }
-    box.hidden = false
-    var ora = coppiaAttuale()
-    var griglia = $('tavolozza')
-    griglia.textContent = ''
-    window.GRAFICHE_COLORI.PRONTI.forEach(function (c) {
+  function costruisciPannello(p) {
+    var box = $(p.box)
+    if (!box) return
+    var dentro = box.querySelector('.pannello-colori')
+    p.tavolozza = el('div', 'tavolozza')
+    p.tavolozza.setAttribute('role', 'group')
+    p.tavolozza.setAttribute('aria-label', 'Colori pronti')
+    dentro.appendChild(p.tavolozza)
+    var misura = el('div', 'su-misura')
+    p.campi = {}
+    ;[['fondo', 'Codice del fondo', '#f5efe3'], ['titolo', 'Codice del titolo e delle figure', '#7c3d36'], ['scritte', 'Codice delle scritte (nomi, programma, data)', '#9b0707']].forEach(function (c) {
+      var w = el('div')
+      var id = p.box + '-' + c[0]
+      var lab = el('label', null, c[1])
+      lab.htmlFor = id
+      var riga = el('div', 'codice')
+      var hex = el('input')
+      hex.id = id
+      hex.type = 'text'
+      hex.setAttribute('inputmode', 'latin')
+      hex.setAttribute('autocomplete', 'off')
+      hex.spellcheck = false
+      hex.placeholder = c[2]
+      hex.maxLength = 7
+      var pick = el('input')
+      pick.type = 'color'
+      pick.setAttribute('aria-label', c[1])
+      hex.addEventListener('change', function () { scriviColore(p, c[0], hex.value) })
+      pick.addEventListener('change', function () { scriviColore(p, c[0], pick.value) })
+      riga.appendChild(hex)
+      riga.appendChild(pick)
+      w.appendChild(lab)
+      w.appendChild(riga)
+      misura.appendChild(w)
+      p.campi[c[0]] = { hex: hex, pick: pick }
+    })
+    dentro.appendChild(misura)
+    var azioni = el('div', 'azioni')
+    var orig = el('button', null, 'Rimetti i colori di Almagreal')
+    orig.type = 'button'
+    orig.addEventListener('click', function () { cambiaColori(p.esperienza(), null) })
+    azioni.appendChild(orig)
+    dentro.appendChild(azioni)
+    p.stato = el('div', 'controllo')
+    p.stato.setAttribute('role', 'status')
+    dentro.appendChild(p.stato)
+  }
+
+  function aggiornaPannello(p) {
+    if (!p.tavolozza) return
+    var m = p.modello()
+    if (!m || !m.nativi) { $(p.box).hidden = true; return }
+    $(p.box).hidden = false
+    var C = window.GRAFICHE_COLORI
+    var esp = p.esperienza()
+    var scelta = C.coppia(esp)
+    var ora = ternaDi(m)
+    p.tavolozza.textContent = ''
+    C.PRONTI.forEach(function (c) {
       var b = el('button')
       b.type = 'button'
       b.title = c.nome
-      b.setAttribute('aria-pressed', c.fondo === ora.fondo && c.scritte === ora.scritte)
-      var dentro = el('span', 'provino', c.nome)
-      dentro.style.background = c.fondo
-      dentro.style.color = c.scritte
-      b.appendChild(dentro)
-      b.addEventListener('click', function () {
-        // il titolo segue il template: dove Almagreal lo ha fatto diverso dal testo (il ledwall), resta diverso
-        cambiaColori({ fondo: c.fondo, scritte: c.scritte, titolo: window.GRAFICHE_COLORI.titoloPer(m.nativi, c.fondo, c.scritte) })
-      })
-      griglia.appendChild(b)
+      b.setAttribute('aria-pressed', !!scelta && c.fondo === scelta.fondo && c.scritte === scelta.scritte)
+      var provino = el('span', 'provino', c.nome)
+      provino.style.background = c.fondo
+      provino.style.color = c.scritte
+      b.appendChild(provino)
+      b.addEventListener('click', function () { cambiaColori(esp, { fondo: c.fondo, scritte: c.scritte, titolo: c.titolo || null }) })
+      p.tavolozza.appendChild(b)
     })
-    $('hex-fondo').value = ora.fondo
-    $('hex-titolo').value = ora.titolo
-    $('hex-scritte').value = ora.scritte
-    $('pick-fondo').value = ora.fondo
-    $('pick-titolo').value = ora.titolo
-    $('pick-scritte').value = ora.scritte
-    var k = Math.min(window.GRAFICHE_COLORI.contrasto(ora.fondo, ora.scritte),
-      window.GRAFICHE_COLORI.contrasto(ora.fondo, ora.titolo))
-    var avviso = $('colori-stato')
-    avviso.hidden = false
+    ;['fondo', 'titolo', 'scritte'].forEach(function (k) { p.campi[k].hex.value = ora[k]; p.campi[k].pick.value = ora[k] })
+    var k = Math.min(C.contrasto(ora.fondo, ora.scritte), C.contrasto(ora.fondo, ora.titolo))
+    // i QR del ringraziamento seguono il colore di Voci d'Italia: con il fondo scuro molti telefoni non li leggono
+    var grazie = window.GRAFICHE_MODELLI['ledwall-grazie']
+    var qr = esp === 'voci' && scelta && C.luminosita(ternaDi(grazie).fondo) < C.luminosita(ternaDi(grazie).scritte)
     if (k < 3) {
-      avviso.className = 'controllo attenzione'
-      avviso.textContent = 'Un colore si somiglia troppo al fondo: sulla grafica si leggerebbe male. Cambialo con uno piu diverso.'
-    } else if (qrStorti()) {
-      avviso.className = 'controllo attenzione'
-      avviso.textContent = AVVISO_QR
+      p.stato.className = 'controllo attenzione'
+      p.stato.textContent = 'Un colore si somiglia troppo al fondo: sulla grafica si leggerebbe male. Cambialo con uno più diverso.'
+    } else if (qr) {
+      p.stato.className = 'controllo attenzione'
+      p.stato.textContent = AVVISO_QR
     } else {
-      avviso.className = 'controllo ok'
-      avviso.textContent = 'I colori si distinguono bene' + (window.GRAFICHE_COLORI.scelta(m.chiave) ? '.' : ' (sono quelli di partenza).')
+      p.stato.className = 'controllo ok'
+      p.stato.textContent = 'I colori si distinguono bene' + (scelta ? '.' : ' (sono quelli originali di Almagreal, grafica per grafica).')
     }
   }
 
-  function scriviColore(quale, valore) {
-    var pulito = window.GRAFICHE_COLORI.pulisci(valore)
+  function aggiornaColori() { PANNELLI.forEach(aggiornaPannello) }
+
+  function scriviColore(p, quale, valore) {
+    var C = window.GRAFICHE_COLORI
+    var pulito = C.pulisci(valore)
     if (!pulito) return
-    var ora = coppiaAttuale()
+    var ora = ternaDi(p.modello())
     if (pulito === ora[quale]) return
-    var nuova = { fondo: ora.fondo, titolo: ora.titolo, scritte: ora.scritte }
+    var esp = p.esperienza()
+    var prima = C.coppia(esp)
+    var nuova = { fondo: ora.fondo, scritte: ora.scritte, titolo: prima ? prima.titolo : null }
     nuova[quale] = pulito
-    // cambiando fondo o testo da una coppia pronta il titolo si riallinea, a meno che non sia lui quello toccato
-    if (quale !== 'titolo') nuova.titolo = window.GRAFICHE_COLORI.titoloPer(modelloDi(tabAttuale()).nativi, nuova.fondo, nuova.scritte)
-    cambiaColori(nuova)
+    // cambiando fondo o scritte il titolo torna a seguire il template, a meno che non sia lui quello toccato
+    if (quale !== 'titolo') nuova.titolo = null
+    cambiaColori(esp, nuova)
   }
 
   // ---------- avvio ----------
@@ -1002,25 +1068,8 @@
     $('quando-tonight').addEventListener('click', function () { cambiaQuando('Tonight') })
     $('quando-tomorrow').addEventListener('click', function () { cambiaQuando('Tomorrow') })
     $('nota-invia').addEventListener('click', inviaNotaPagina)
-    $('hex-fondo').addEventListener('change', function () { scriviColore('fondo', this.value) })
-    $('hex-titolo').addEventListener('change', function () { scriviColore('titolo', this.value) })
-    $('pick-titolo').addEventListener('change', function () { scriviColore('titolo', this.value) })
-    $('hex-scritte').addEventListener('change', function () { scriviColore('scritte', this.value) })
-    $('pick-fondo').addEventListener('change', function () { scriviColore('fondo', this.value) })
-    $('pick-scritte').addEventListener('change', function () { scriviColore('scritte', this.value) })
-    $('colori-tutte').addEventListener('click', function () {
-      var ora = coppiaAttuale()
-      window.GRAFICHE_COLORI.impostaTutti(modelliConColori(), { fondo: ora.fondo, scritte: ora.scritte })
-      aggiornaColori()
-      anteprima(0)
-      messaggio('Tutte le grafiche della serata ora hanno questi colori.', 'ok')
-    })
-    $('colori-originale').addEventListener('click', function () {
-      window.GRAFICHE_COLORI.impostaTutti(modelliConColori(), null)
-      aggiornaColori()
-      anteprima(0)
-      messaggio('Grafiche tornate ai colori di partenza.', 'ok')
-    })
+    PANNELLI.forEach(costruisciPannello)
+    pannelliPronti = true
     aggiornaColori()
   }
 

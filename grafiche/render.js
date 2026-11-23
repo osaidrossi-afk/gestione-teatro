@@ -348,7 +348,7 @@
       ctx.setTransform(scala, 0, 0, scala, 0, 0)
       if (global.GRAFICHE_SOLO) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, modello.w, modello.h) }
       else {
-        var scelto = modello.nativi && global.GRAFICHE_COLORI ? global.GRAFICHE_COLORI.scelta(modello.chiave) : null
+        var scelto = modello.nativi && global.GRAFICHE_COLORI ? global.GRAFICHE_COLORI.scelta(modello.chiave, modello.nativi) : null
         if (scelto) {
           // si ricolora alla dimensione a cui si disegna: in anteprima e piccolo e veloce, allo scarico e a misura piena
           var lw = Math.max(1, Math.round(modello.w * scala)), lh = Math.max(1, Math.round(modello.h * scala))

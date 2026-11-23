@@ -284,7 +284,7 @@
   // I due colori con cui e disegnato ogni fondo di Almagreal. Se chi scarica ne ha scelti altri (colori.js), valgono
   // quelli: il fondo PNG viene ricolorato e il testo si scrive con lo stesso inchiostro, cosi la grafica resta d'un pezzo.
   function tinta(chiave, nativi) {
-    var s = global.GRAFICHE_COLORI && global.GRAFICHE_COLORI.scelta(chiave)
+    var s = global.GRAFICHE_COLORI && global.GRAFICHE_COLORI.scelta(chiave, nativi)
     return s || nativi
   }
   // Misurati sui template di Almagreal (17/11/2026): negli esterni, negli interni e nel ringraziamento il titolo e
@@ -408,18 +408,21 @@
     return utili.length ? utili : [{ t: ' ', f: 'sans', size: size, color: color }]
   }
 
-  function locandina(plate, colore) {
+  // Colori nativi misurati sui PNG di Almagreal: fondo, titolo stampato nel fondo, data che scriviamo noi.
+  // Si ricolorano come le altre grafiche (23/11/2026): la locandina di Voci segue il colore di Voci d'Italia.
+  function locandina(chiave, plate, nativi) {
     return {
-      w: 3840, h: 2160, plate: plate,
+      w: 3840, h: 2160, plate: plate, chiave: chiave, nativi: nativi,
       foto: [{ x: 960.5 * K, y: 91.7817 * K, w: 896.4366 * K, h: 896.4366 * K }],
       blocchi: function (d) {
+        var colore = tinta(chiave, nativi).scritte
         return [{ nome: 'data', left: (475.77 - 400) * K, top: 60 * K, width: 800 * K, align: 'center', lh: 1.4, ls: 0,
           lines: [riga2(partiData(d.testoData || '', 40 * K, colore), 1.4)] }]
       },
     }
   }
-  MODELLI['locandina-voci'] = locandina('plate/locandina-voci.png', '#9c0d08')
-  MODELLI['locandina-btc'] = locandina('plate/locandina-btc.png', '#130a80')
+  MODELLI['locandina-voci'] = locandina('locandina-voci', 'plate/locandina-voci.png', { fondo: '#e99d25', titolo: '#9b0707', scritte: '#9c0d08' })
+  MODELLI['locandina-btc'] = locandina('locandina-btc', 'plate/locandina-btc.png', { fondo: '#efa0a0', titolo: '#00007e', scritte: '#130a80' })
 
   global.GRAFICHE_MODELLI = MODELLI
 })(window)
